@@ -67,6 +67,6 @@ export const useCartStore = create<CartStore>()(
       taxAmount: () => Math.round(get().subtotal() * TAX_RATE),
       totalAmount: () => get().subtotal() + get().taxAmount(),
     }),
-    { name: "smartqr-cart", skipHydration: false }
+    { name: "smartqr-cart", skipHydration: true }
   )
 );

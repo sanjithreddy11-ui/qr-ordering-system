@@ -19,7 +19,7 @@ const TAX_RATE = 0.05;
 const createOrder = asyncHandler(async (req, res) => {
   const {
     sessionId,
-    restaurantId,
+    restaurantId: clientRestaurantId,
     tableToken,
     items,
     orderType,
@@ -30,7 +30,7 @@ const createOrder = asyncHandler(async (req, res) => {
   if (!sessionId) {
     throw new ApiError(400, "sessionId is required");
   }
-  if (!restaurantId || !tableToken || !Array.isArray(items) || items.length === 0) {
+  if (!clientRestaurantId || !tableToken || !Array.isArray(items) || items.length === 0) {
     throw new ApiError(400, "restaurantId, tableToken and at least one item are required");
   }
   if (!["dine-in", "takeaway"].includes(orderType)) {
@@ -40,6 +40,21 @@ const createOrder = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid paymentMethod");
   }
 
+  // --- Table token validation (required) ---
+  // The Table collection is the single source of truth for table identity.
+  // tableToken is looked up on its own (tokens are globally unique — see
+  // the unique index on Table.token) rather than scoped to the client's
+  // claimed restaurantId, specifically so a mismatched/spoofed restaurantId
+  // can't be used to smuggle a fake table through.
+  const table = await Table.findOne({ token: tableToken });
+  if (!table) {
+    throw new ApiError(404, "Invalid table. Please scan the QR code again.");
+  }
+
+  // restaurantId is derived from the matched Table document, never trusted
+  // from the client, from here on down.
+  const restaurantId = table.restaurantId;
+
   const session = await Session.findOne({ sessionId });
   if (!session) {
     throw new ApiError(400, "Session not found. Please reopen the menu from your QR code.");
@@ -47,11 +62,6 @@ const createOrder = asyncHandler(async (req, res) => {
   if (session.isExpired()) {
     throw new ApiError(410, "Your session has expired. Please reopen the menu from your QR code.");
   }
-
-  // Resolve the table token. If it doesn't exist yet, we don't hard-fail —
-  // some restaurants may not have seeded tables yet — but we do try to
-  // attach a friendly label when we can.
-  const table = await Table.findOne({ token: tableToken, restaurantId });
 
   const menuItemIds = items.map((i) => i.id);
   const menuItems = await MenuItem.find({
@@ -99,8 +109,8 @@ const createOrder = asyncHandler(async (req, res) => {
     orderId: generateOrderId(),
     sessionId,
     restaurantId,
-    tableToken,
-    tableLabel: table ? table.label : null,
+    tableToken: table.token,
+    tableLabel: table.label,
     items: orderItems,
     subtotal,
     taxAmount,
