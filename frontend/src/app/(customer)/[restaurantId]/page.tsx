@@ -114,6 +114,13 @@ export default function CafeLandingPage() {
       cancelled = true;
     };
   }, [restaurantId]);
+  if (!restaurant && !loadFailed) {
+  return (
+    <main className="relative min-h-dvh overflow-hidden">
+      <BackgroundDecor1 />
+    </main>
+  );
+}
 
   const highlights =
     restaurant?.highlights && restaurant.highlights.length > 0
@@ -133,9 +140,7 @@ export default function CafeLandingPage() {
       <BackgroundDecor1 />
 
       <div className="relative z-10 mx-auto flex min-h-[40dvh] max-w-[480px] flex-col items-center px-6 pt-14 text-center">
-        {!restaurant && !loadFailed && (
-          <div className="font-body text-sm text-text-secondary">Loading cafe details…</div>
-        )}
+        
 
         {loadFailed && (
           <div className="font-body text-sm text-text-secondary">
