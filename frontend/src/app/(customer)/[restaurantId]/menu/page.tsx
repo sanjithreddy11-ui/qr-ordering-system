@@ -1,0 +1,216 @@
+"use client";
+
+import { useMemo, useCallback, useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { ArrowLeft } from "lucide-react";
+import BackgroundDecor from "@/components/customer/BackgroundDecor";
+import RestaurantHeader from "@/components/customer/RestaurantHeader";
+import SearchBar from "@/components/customer/SearchBar";
+import FilterTabs, { FilterValue } from "@/components/customer/FilterTabs";
+import CategoryHeader from "@/components/customer/CategoryHeader";
+import FoodCard from "@/components/customer/FoodCard";
+import FloatingCart from "@/components/customer/FloatingCart";
+import CategoryDrawer from "@/components/customer/CategoryDrawer";
+import { menu as mockMenu, type MenuItem, type MenuCategory } from "@/lib/menu-data";
+import { useCartStore } from "@/store/cart-store";
+import { useSessionStore } from "@/store/session-store";
+import { useCustomerNavigate } from "@/lib/customer-nav";
+import { fetchMenu } from "@/lib/api";
+
+export default function MenuPage() {
+  // Sourced from the session store — NOT useSearchParams(). The table
+  // token was already read once by the [restaurantId] layout; every page
+  // after that reuses the stored value so it never goes stale or "null".
+  const { restaurantSlug, tableToken } = useSessionStore();
+  const restaurantId = restaurantSlug ?? "lifafa";
+  const goTo = useCustomerNavigate();
+
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<FilterValue>("all");
+  const [liveMenu, setLiveMenu] = useState<MenuCategory[] | null>(null);
+
+  const {
+    items,
+    addItem,
+    removeItem,
+    totalItems,
+    subtotal,
+    setTableToken,
+  } = useCartStore();
+
+  // Mirror the session's restaurant/table identity into cart-store, since
+  // cart-store's own addItem() signature still expects them (kept as-is
+  // per existing cart logic). session-store is the source of truth here,
+  // not the URL.
+  useEffect(() => {
+    if (restaurantId && tableToken) {
+      setTableToken(restaurantId, tableToken);
+    }
+  }, [restaurantId, tableToken, setTableToken]);
+
+  // Try loading the live menu from the backend. If the backend isn't
+  // running yet (e.g. you're still developing the UI), silently fall back
+  // to the local mock data so the page never breaks.
+  useEffect(() => {
+    let cancelled = false;
+    fetchMenu(restaurantId)
+      .then((data) => {
+        if (!cancelled && data.length > 0) setLiveMenu(data);
+      })
+      .catch(() => {
+        // Backend not reachable — keep using mock data, no user-facing error.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [restaurantId]);
+
+  const menu = liveMenu ?? mockMenu;
+
+  const filteredMenu = useMemo(() => {
+    const q = search.trim().toLowerCase();
+
+    return menu
+      .map((category) => ({
+        ...category,
+        items: category.items.filter((item) => {
+          const matchesDiet =
+            filter === "all" || item.diet === filter;
+
+          const matchesSearch =
+            !q ||
+            item.name.toLowerCase().includes(q) ||
+            item.description.toLowerCase().includes(q);
+
+          return matchesDiet && matchesSearch;
+        }),
+      }))
+      .filter((category) => category.items.length > 0);
+  }, [search, filter, menu]);
+
+  const handleAdd = useCallback(
+    (item: MenuItem) => {
+      addItem(item, restaurantId, tableToken ?? undefined);
+    },
+    [addItem, restaurantId, tableToken]
+  );
+
+  const handleRemove = useCallback(
+    (item: MenuItem) => {
+      removeItem(item);
+    },
+    [removeItem]
+  );
+
+  const handleCategorySelect = (id: string) => {
+    const el = document.getElementById(`category-${id}`);
+    el?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
+  return (
+    <main className="relative min-h-dvh overflow-x-hidden pb-32">
+      <BackgroundDecor />
+
+      {/* Back button — replaces the bottom nav on this page, since the
+          menu has its own floating category-jump button instead. */}
+      <motion.button
+        initial={{ opacity: 0, scale: 0.8, x: -8 }}
+        animate={{ opacity: 1, scale: 1, x: 0 }}
+        transition={{ type: "spring", stiffness: 400, damping: 28 }}
+        whileTap={{ scale: 0.92 }}
+        onClick={() => goTo("/")}
+        className="fixed left-4 top-4 z-[1100] flex h-11 w-11 items-center justify-center rounded-full"
+        style={{
+          background: "rgba(255,255,255,0.65)",
+          border: "1px solid rgba(255,255,255,0.5)",
+          backdropFilter: "blur(14px)",
+          WebkitBackdropFilter: "blur(14px)",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.12), inset 0 1px 1px rgba(255,255,255,0.8)",
+        }}
+        aria-label="Back to Home"
+      >
+        <ArrowLeft size={19} strokeWidth={2.2} color="#263429" />
+      </motion.button>
+
+      <div className="relative z-10">
+        <RestaurantHeader />
+
+        <div className="sticky top-0 z-10 space-y-3 bg-bg-primary/90 px-6 pb-4 pt-2 backdrop-blur-[2px]">
+          <SearchBar
+            value={search}
+            onChange={setSearch}
+          />
+
+          <FilterTabs
+            value={filter}
+            onChange={setFilter}
+          />
+        </div>
+
+        <div className="px-6">
+          {filteredMenu.length === 0 && (
+            <p className="font-body py-16 text-center text-[14px] text-text-secondary">
+              No dishes match your search.
+            </p>
+          )}
+
+          {filteredMenu.map((category, idx) => (
+            <section
+              key={category.id}
+              id={`category-${category.id}`}
+              className="mb-4 scroll-mt-[150px]"
+            >
+              <CategoryHeader
+                title={category.title}
+                birdSide={
+                  idx % 2 === 0
+                    ? "right"
+                    : "left"
+                }
+              />
+
+              <div className="flex flex-col gap-4 pb-8">
+                {category.items.map(
+                  (item, itemIdx) => {
+                    const quantity =
+                      items.find(
+                        (e) =>
+                          e.item.id === item.id
+                      )?.quantity ?? 0;
+
+                    return (
+                      <FoodCard
+                        key={item.id}
+                        item={item}
+                        quantity={quantity}
+                        onAdd={handleAdd}
+                        onRemove={handleRemove}
+                        index={itemIdx}
+                      />
+                    );
+                  }
+                )}
+              </div>
+            </section>
+          ))}
+        </div>
+      </div>
+
+      <CategoryDrawer
+        categories={menu.map((c) => ({
+          id: c.id,
+          title: c.title,
+        }))}
+        onSelect={handleCategorySelect}
+      />
+
+      <FloatingCart
+        itemCount={totalItems()}
+        total={subtotal()}
+      />
+    </main>
+  );
+}

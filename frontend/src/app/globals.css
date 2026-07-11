@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #F8F5ED;
+  --bg-secondary: #FCFBF8;
+  --bg-card: #FEFDFC;
+  --green-primary: #324234;
+  --green-secondary: #475A47;
+  --green-deep: #16281E;
+  --gold-accent: #C4972E;
+  --gold-soft: #EADFC0;
+  --text-primary: #1C1C1C;
+  --text-secondary: #666666;
+  --border-soft: #E7E1D6;
+}
+
+@theme inline {
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-card: var(--bg-card);
+  --color-green-primary: var(--green-primary);
+  --color-green-secondary: var(--green-secondary);
+  --color-green-deep: var(--green-deep);
+  --color-gold-accent: var(--gold-accent);
+  --color-gold-soft: var(--gold-soft);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-border-soft: var(--border-soft);
+
+  --font-display: "Cormorant Garamond", serif;
+  --font-body: "Inter", sans-serif;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100dvh;
+  background: var(--bg-primary);
+  overflow-x: hidden;
+}
+
+body {
+  color: var(--text-primary);
+  font-family: "Inter", sans-serif;
+
+  width: 100%;
+  margin: 0;
+  position: relative;
+
+  box-shadow:
+    inset 8px 0 18px -18px rgba(28, 28, 28, 0.1),
+    inset -8px 0 18px -18px rgba(28, 28, 28, 0.1);
+}
+
+.font-display {
+  font-family: "Cormorant Garamond", serif;
+}
+
+/* Small gold diamond divider, used between the name/tagline blocks */
+.divider-diamond {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.divider-diamond::before,
+.divider-diamond::after {
+  content: "";
+  width: 28px;
+  height: 1px;
+  background: var(--gold-accent);
+  opacity: 0.6;
+}
+.divider-diamond span {
+  width: 6px;
+  height: 6px;
+  background: var(--gold-accent);
+  transform: rotate(45deg);
+  display: inline-block;
+}
+
+/* Handmade washi paper texture */
+.washi-bg {
+  position: absolute;
+  inset: 0;
+
+  background-image: url("/assets/paper-texture.svg");
+  background-size: 300px 300px;
+  background-repeat: repeat;
+
+  opacity: 0.10;
+  pointer-events: none;
+  z-index: 0;
+  mix-blend-mode: multiply;
+}
+
+::selection {
+  background: var(--green-primary);
+  color: var(--bg-primary);
+}
+
+/* Thin, elegant scrollbars */
+::-webkit-scrollbar {
+  width: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-soft);
+}
