@@ -63,7 +63,6 @@ export default function CheckoutPage() {
       });
 
       setOrder(order);
-      clearCart();
       router.push(buildCustomerUrl("/order-success"));
     } catch (err) {
       setError(

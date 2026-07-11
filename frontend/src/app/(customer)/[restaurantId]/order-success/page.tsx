@@ -567,7 +567,6 @@ export default function OrderSuccessPage() {
           transition={{ delay: 0.8 }}
           whileTap={{ scale: 0.97 }}
           onClick={() => {
-            clearOrder();
             router.push(buildCustomerUrl("/menu"));
           }}
           style={{

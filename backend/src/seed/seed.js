@@ -16,7 +16,7 @@ async function seed() {
     { restaurantId: RESTAURANT_ID },
     {
       restaurantId: RESTAURANT_ID,
-      name: "Lifafa",
+      name: "Lifafa Cafe & Bistro",
       logo: "/logo.png",
       description:
         "A cozy neighborhood cafe serving fresh, seasonal comfort food and specialty drinks.",
