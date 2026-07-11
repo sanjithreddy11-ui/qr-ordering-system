@@ -84,6 +84,6 @@ export const useSessionStore = create<SessionStore>()(
           expiresAt: undefined,
         }),
     }),
-    { name: "smartqr-session" }
+    { name: "smartqr-session", skipHydration: true }
   )
 );

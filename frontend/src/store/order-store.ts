@@ -22,6 +22,6 @@ export const useOrderStore = create<OrderStore>()(
         ),
       clearOrder: () => set({ currentOrder: null }),
     }),
-    { name: "smartqr-order" }
+    { name: "smartqr-order", skipHydration: true }
   )
 );
