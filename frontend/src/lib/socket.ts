@@ -8,7 +8,11 @@ let socket: Socket | null = null;
 export function getSocket(): Socket {
   if (!socket) {
     socket = io(API_BASE_URL, {
-      transports: ["websocket"],
+      // Starts on HTTP long-polling and upgrades to a real WebSocket once
+      // the handshake succeeds — this is Socket.io's own default and is
+      // more reliable behind hosted proxies (e.g. Render) than forcing
+      // "websocket" only, especially right after a free-tier cold start.
+      transports: ["polling", "websocket"],
       autoConnect: true,
     });
   }
