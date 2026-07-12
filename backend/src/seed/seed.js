@@ -16,12 +16,12 @@ async function seed() {
     { restaurantId: RESTAURANT_ID },
     {
       restaurantId: RESTAURANT_ID,
-      name: "Lifafa",
+      name: "Lifafa Cafe & Bistro",
       logo: "/logo.png",
       description:
         "A cozy neighborhood cafe serving fresh, seasonal comfort food and specialty drinks.",
-      address: "123 Garden Lane, Hyderabad, Telangana",
-      phone: "+91 98765 43210",
+      address: "Uppal, Hyderabad",
+      rating: 4.4,
       theme: { primaryColor: "#3A4C3B", secondaryColor: "#263429" },
     },
     { upsert: true, new: true }

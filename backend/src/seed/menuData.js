@@ -49,13 +49,14 @@ const rawMenu = [
 // Flatten into MenuItem documents
 function buildMenuItemDocs() {
   const docs = [];
-  rawMenu.forEach((category) => {
+  rawMenu.forEach((category, categoryIdx) => {   // 👈 grab category index
     category.items.forEach((item, idx) => {
       docs.push({
         id: item.id,
         restaurantId: RESTAURANT_ID,
         categoryId: category.id,
         categoryTitle: category.title,
+        categorySortOrder: categoryIdx,           // 👈 new field: 0=Starters,1=Mains,2=Desserts,3=Beverages
         name: item.name,
         description: item.description,
         price: item.price,
@@ -68,5 +69,4 @@ function buildMenuItemDocs() {
   });
   return docs;
 }
-
 module.exports = { RESTAURANT_ID, buildMenuItemDocs };

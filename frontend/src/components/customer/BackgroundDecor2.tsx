@@ -29,24 +29,6 @@ export default function BackgroundDecor() {
           <Image src="/assets/ink-stain.svg" alt="" width={320} height={240} />
         </div>
       ))}
-
-    
-
-      {/* Layer 3.5 — sumi-e branch rising along the left edge, balancing the top-right sakura */}
-      <div className="fixed bottom-0 left-0 z-0 w-[210px] opacity-90">
-        <Image src="/assets/branch-bottomleft-removebg-preview.png" alt="" width={280} height={320} />
-      </div>
-
-      {/* Layer 4 — sakura branch, top-right */}
-      <div className="fixed right-[-32px] top-[-12px] z-0 w-[350px] opacity-80">
-        <Image
-          src="/assets/branch.png"
-          alt=""
-          width={350}
-          height={1000}
-          priority
-        />
-      </div>
     </div>
   );
 }
