@@ -10,6 +10,10 @@ const menuItemSchema = new mongoose.Schema(
     restaurantId: { type: String, required: true, index: true },
     categoryId: { type: String, required: true }, // e.g. "starters"
     categoryTitle: { type: String, required: true }, // e.g. "Starters"
+    // Controls the order categories appear in on the menu (Starters before
+    // Mains before Desserts, etc.) — separate from `sortOrder`, which only
+    // orders items within a category.
+    categorySortOrder: { type: Number, default: 0 },
     name: { type: String, required: true },
     description: { type: String, default: "" },
     price: { type: Number, required: true },

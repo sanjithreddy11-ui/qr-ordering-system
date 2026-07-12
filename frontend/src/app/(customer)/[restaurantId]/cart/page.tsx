@@ -115,24 +115,22 @@ export default function CartPage() {
       {/* Proceed Button */}
       <div className="fixed bottom-4 left-0 right-0 z-[999] mx-auto w-[calc(100%-32px)] max-w-[448px] px-4">
         <motion.button
-  whileTap={{ scale: 0.97 }}
-  onClick={() => router.push(buildCustomerUrl("/checkout"))}
-  className="font-body flex w-full items-center justify-between rounded-full px-6 py-4 text-[15px] font-semibold text-bg-primary shadow-lg"
-  style={{
-    background: "linear-gradient(135deg, #3A4C3B 0%, #263429 100%)",
-    letterSpacing: "0.3px",
-  }}
->
-  <span className="font-body text-sm opacity-90">
-    ₹ {total}
-  </span>
+          whileTap={{ scale: 0.97 }}
+          onClick={() => router.push(buildCustomerUrl("/checkout"))}
+          className="font-body flex h-14 w-full items-center justify-between gap-3 rounded-full px-6 text-bg-primary shadow-lg"
+          style={{
+            background: "linear-gradient(135deg, #3A4C3B 0%, #263429 100%)",
+            letterSpacing: "0.3px",
+          }}
+        >
+          <span className="font-body whitespace-nowrap text-sm font-semibold leading-none opacity-90">
+            ₹{total}
+          </span>
 
-  <span className="font-body text-[15px] font-semibold">
-    Proceed to Checkout →
-  </span>
-
-  <span className="w-[60px]" />
-</motion.button>
+          <span className="font-body whitespace-nowrap text-[15px] font-semibold leading-none">
+            Proceed to Checkout →
+          </span>
+        </motion.button>
       </div>
     </main>
   );

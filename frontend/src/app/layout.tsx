@@ -11,7 +11,7 @@ import "@fontsource/inter/700.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Yugen | Menu",
+  title: "Lifafa  |Demo Menu",
   description: "A quiet, handcrafted dining experience.",
 };
 

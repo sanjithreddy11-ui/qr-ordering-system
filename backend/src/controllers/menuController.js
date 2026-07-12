@@ -8,7 +8,7 @@ const getMenu = asyncHandler(async (req, res) => {
   const { restaurantId } = req.params;
 
   const items = await MenuItem.find({ restaurantId, isAvailable: true }).sort({
-    categoryId: 1,
+    categorySortOrder: 1,
     sortOrder: 1,
   });
 

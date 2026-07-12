@@ -52,7 +52,7 @@ export default function FilterTabs({
         delay: 0.18,
         ease: "easeOut",
       }}
-      className="flex items-center gap-2.5"
+      className="flex items-stretch gap-2.5"
     >
       {options.map((opt) => {
         const active = value === opt.value;
@@ -63,14 +63,14 @@ export default function FilterTabs({
             key={opt.value}
             type="button"
             onClick={() => onChange(opt.value)}
-            className={`font-body flex-1 rounded-full border px-4 py-2.5 text-[13px] font-medium transition-all duration-300 ${
+            className={`font-body flex h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full border px-3 text-[13px] font-medium leading-none transition-all duration-300 ${
               active
                 ? "border-green-primary bg-green-primary text-bg-primary shadow-md"
                 : "border-border-soft bg-bg-card text-text-primary hover:bg-bg-secondary"
             }`}
             style={{ letterSpacing: "0.5px" }}
           >
-            <motion.div
+            <motion.span
               whileTap={{ scale: 0.95 }}
               className="flex items-center justify-center gap-2"
             >
@@ -79,13 +79,13 @@ export default function FilterTabs({
                 strokeWidth={2}
                 className={
                   active
-                    ? "text-bg-primary"
-                    : "text-green-primary"
+                    ? "text-bg-primary shrink-0"
+                    : "text-green-primary shrink-0"
                 }
               />
 
               <span>{opt.label.toUpperCase()}</span>
-            </motion.div>
+            </motion.span>
           </button>
         );
       })}

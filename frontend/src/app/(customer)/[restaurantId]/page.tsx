@@ -81,101 +81,121 @@ export default function CafeLandingPage() {
           transition={{ duration: 0.4 }}
           className="flex w-full flex-col items-center"
         >
-          {/* Logo medallion — premium floating treatment. Sizing/position
-              of everything below the logo is untouched; only this block
-              changed. Footprint grows from 96px to 108px to make room for
-              the outer ring, which nudges spacing below by ~6px — an
-              unavoidable side effect of adding a ring around the existing
-              circle rather than a deliberate layout change. */}
+          {/* Logo medallion — premium, ATTENTION-GRABBING treatment.
+              Footprint grows from 96px to 120px to make room for the
+              pulse rings, which nudges spacing below by ~12px — an
+              unavoidable side effect of the ring/pulse effects rather
+              than a deliberate layout change. */}
           <div
             className="relative mb-6 flex items-center justify-center"
-            style={{ width: 108, height: 108 }}
+            style={{ width: 120, height: 120 }}
           >
-            {/* 9. Soft ambient background light behind everything */}
+            {/* Big soft ambient halo behind everything */}
             <div
               className="pointer-events-none absolute rounded-full"
               style={{
-                width: 220,
-                height: 220,
+                width: 260,
+                height: 260,
                 left: "50%",
                 top: "50%",
                 transform: "translate(-50%, -50%)",
                 background:
-                  "radial-gradient(circle, rgba(201,166,104,0.08) 0%, rgba(201,166,104,0) 70%)",
+                  "radial-gradient(circle, rgba(201,166,104,0.14) 0%, rgba(201,166,104,0) 70%)",
               }}
             />
 
-            {/* 2. Premium gold glow — slow pulse, never neon */}
+            {/* Bright, clearly-pulsing gold glow */}
             <motion.div
               className="pointer-events-none absolute rounded-full"
               style={{
-                width: 140,
-                height: 140,
+                width: 150,
+                height: 150,
                 left: "50%",
                 top: "50%",
                 transform: "translate(-50%, -50%)",
                 background:
-                  "radial-gradient(circle, rgba(201,166,104,0.55) 0%, rgba(201,166,104,0) 70%)",
-                filter: "blur(40px)",
+                  "radial-gradient(circle, rgba(201,166,104,0.65) 0%, rgba(201,166,104,0) 70%)",
+                filter: "blur(30px)",
               }}
-              animate={{ opacity: [0.18, 0.32, 0.18] }}
-              transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
+              animate={{ opacity: [0.28, 0.6, 0.28], scale: [1, 1.15, 1] }}
+              transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
             />
 
-            {/* 6. Initial entrance — runs once on mount */}
+            {/* Radar-style pulse rings — two, staggered, continuously
+                expanding and fading outward. This is the main thing that
+                pulls the eye without needing motion elsewhere on the page. */}
+            {[0, 1].map((i) => (
+              <motion.div
+                key={i}
+                className="pointer-events-none absolute rounded-full"
+                style={{
+                  width: 108,
+                  height: 108,
+                  left: "50%",
+                  top: "50%",
+                  x: "-50%",
+                  y: "-50%",
+                  border: "1.5px solid rgba(201,166,104,0.6)",
+                }}
+                animate={{ scale: [1, 1.55], opacity: [0.55, 0] }}
+                transition={{
+                  duration: 2.6,
+                  repeat: Infinity,
+                  ease: "easeOut",
+                  delay: i * 1.3,
+                }}
+              />
+            ))}
+
+            {/* Initial entrance — runs once on mount, a touch more
+                dramatic than a plain fade so the logo announces itself */}
             <motion.div
               className="relative"
               style={{ width: 108, height: 108 }}
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              initial={{ opacity: 0, scale: 0.7, y: 24 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ duration: 0.7, type: "spring", bounce: 0.25 }}
+              transition={{ duration: 0.8, type: "spring", bounce: 0.4 }}
             >
-              {/* 1. Slow float + 8. hover/tap interaction */}
+              {/* Float + hover/tap */}
               <motion.div
                 className="relative flex items-center justify-center"
                 style={{ width: 108, height: 108 }}
-                animate={{ y: [0, -3, 0], scale: [1, 1.03, 1], rotate: [0, 0.3, 0] }}
-                transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
+                animate={{ y: [0, -6, 0], scale: [1, 1.05, 1] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.95 }}
               >
-                {/* 3. Outer ring */}
-                <div
-                  className="pointer-events-none absolute inset-0 rounded-full"
-                  style={{ border: "2px solid rgba(201,166,104,0.85)" }}
-                />
-
-                {/* 7. Gold shimmer — travels around the outer ring once
-                    every 10s (0.8s motion + 9.2s pause), never continuous */}
+                {/* Bright light continuously orbiting the ring — this is
+                    the detail that reads as "alive" at a glance */}
                 <motion.div
                   className="pointer-events-none absolute inset-0"
                   style={{ borderRadius: "9999px" }}
                   animate={{ rotate: 360 }}
-                  transition={{
-                    duration: 0.8,
-                    repeat: Infinity,
-                    repeatDelay: 9.2,
-                    ease: "easeInOut",
-                  }}
+                  transition={{ duration: 3.5, repeat: Infinity, ease: "linear" }}
                 >
                   <span
                     className="absolute rounded-full"
                     style={{
-                      top: -1,
+                      top: -3,
                       left: "50%",
-                      width: 6,
-                      height: 6,
-                      marginLeft: -3,
+                      width: 12,
+                      height: 12,
+                      marginLeft: -6,
                       background:
-                        "radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 70%)",
-                      boxShadow: "0 0 6px rgba(255,255,255,0.8)",
+                        "radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,215,140,0.7) 45%, rgba(255,215,140,0) 75%)",
+                      boxShadow: "0 0 12px 3px rgba(255,215,140,0.65)",
                     }}
                   />
                 </motion.div>
 
-                {/* 3. Inner ring + 4. layered shadow + 5. glass highlight,
-                    all on the same circle that holds the logo image —
-                    same 96px size and background as before */}
+                {/* Outer ring */}
+                <div
+                  className="pointer-events-none absolute inset-0 rounded-full"
+                  style={{ border: "2px solid rgba(201,166,104,0.9)" }}
+                />
+
+                {/* Inner ring + layered shadow + glass highlight, on the
+                    same 96px circle that holds the logo image */}
                 <div
                   className="absolute flex items-center justify-center overflow-hidden rounded-full"
                   style={{
@@ -183,10 +203,10 @@ export default function CafeLandingPage() {
                     background: "var(--green-deep)",
                     border: "1px solid rgba(255,255,255,0.65)",
                     boxShadow:
-                      "0 8px 20px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.10), 0 0 35px rgba(201,166,104,0.18)",
+                      "0 8px 20px rgba(0,0,0,0.15), 0 20px 45px rgba(0,0,0,0.12), 0 0 45px rgba(201,166,104,0.35)",
                   }}
                 >
-                  {/* 5. Glass highlight — top-left, ~10% opacity */}
+                  {/* Glass highlight — top-left, ~10% opacity */}
                   <div
                     className="pointer-events-none absolute rounded-full"
                     style={{
