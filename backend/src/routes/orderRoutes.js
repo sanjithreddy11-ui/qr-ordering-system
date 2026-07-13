@@ -6,14 +6,17 @@ const {
   listOrdersBySession,
   updateOrderStatus,
 } = require("../controllers/orderController");
+const { getAnalytics } = require("../controllers/analyticsController");
 
 const router = express.Router();
 
 router.post("/", createOrder);
 router.get("/", listOrders);
-// IMPORTANT: this must come before "/:orderId" or Express will treat
-// "session" as an orderId value and this route will never be reached.
+// IMPORTANT: both of these must come before "/:orderId" or Express will
+// treat "session"/"analytics" as an orderId value and these routes will
+// never be reached.
 router.get("/session/:sessionId", listOrdersBySession);
+router.get("/analytics", getAnalytics);
 router.get("/:orderId", getOrderById);
 router.patch("/:orderId/status", updateOrderStatus);
 

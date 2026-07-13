@@ -11,9 +11,12 @@ import CategoryHeader from "@/components/customer/CategoryHeader";
 import FoodCard from "@/components/customer/FoodCard";
 import FloatingCart from "@/components/customer/FloatingCart";
 import CategoryDrawer from "@/components/customer/CategoryDrawer";
+import WaiterCallButton from "@/components/customer/WaiterCallButton";
+import GroupOrderDrawer from "@/components/customer/GroupOrderDrawer";
 import { menu as mockMenu, type MenuItem, type MenuCategory } from "@/lib/menu-data";
 import { useCartStore } from "@/store/cart-store";
 import { useSessionStore } from "@/store/session-store";
+import { useGroupOrderStore } from "@/store/group-order-store";
 import { useCustomerNavigate } from "@/lib/customer-nav";
 import { fetchMenu } from "@/lib/api";
 
@@ -37,6 +40,15 @@ export default function MenuPage() {
     subtotal,
     setTableToken,
   } = useCartStore();
+
+  const {
+    active: groupActive,
+    addItem: groupAddItem,
+    removeItem: groupRemoveItem,
+    quantityFor: groupQuantityFor,
+    totalItems: groupTotalItems,
+    totalSubtotal: groupTotalSubtotal,
+  } = useGroupOrderStore();
 
   // Mirror the session's restaurant/table identity into cart-store, since
   // cart-store's own addItem() signature still expects them (kept as-is
@@ -90,16 +102,24 @@ export default function MenuPage() {
 
   const handleAdd = useCallback(
     (item: MenuItem) => {
+      if (groupActive) {
+        groupAddItem(item);
+        return;
+      }
       addItem(item, restaurantId, tableToken ?? undefined);
     },
-    [addItem, restaurantId, tableToken]
+    [addItem, restaurantId, tableToken, groupActive, groupAddItem]
   );
 
   const handleRemove = useCallback(
     (item: MenuItem) => {
+      if (groupActive) {
+        groupRemoveItem(item);
+        return;
+      }
       removeItem(item);
     },
-    [removeItem]
+    [removeItem, groupActive, groupRemoveItem]
   );
 
   const handleCategorySelect = (id: string) => {
@@ -111,7 +131,7 @@ export default function MenuPage() {
   };
 
   return (
-    <main className="relative min-h-dvh overflow-x-hidden pb-32">
+    <main className="relative min-h-dvh overflow-x-clip pb-32">
       <BackgroundDecor />
 
       {/* Back button — replaces the bottom nav on this page, since the
@@ -135,10 +155,15 @@ export default function MenuPage() {
         <ArrowLeft size={19} strokeWidth={2.2} color="#263429" />
       </motion.button>
 
+      <WaiterCallButton
+        restaurantId={restaurantId}
+        tableToken={tableToken}
+      />
+
       <div className="relative z-10">
         <RestaurantHeader />
 
-        <div className="sticky top-0 z-10 space-y-3 bg-bg-primary/90 px-6 pb-4 pt-2 backdrop-blur-[2px]">
+        <div className="sticky top-0 z-30 space-y-3 bg-bg-primary/90 px-6 pb-4 pt-2 backdrop-blur-[2px]">
           <SearchBar
             value={search}
             onChange={setSearch}
@@ -175,11 +200,9 @@ export default function MenuPage() {
               <div className="flex flex-col gap-4 pb-8">
                 {category.items.map(
                   (item, itemIdx) => {
-                    const quantity =
-                      items.find(
-                        (e) =>
-                          e.item.id === item.id
-                      )?.quantity ?? 0;
+                    const quantity = groupActive
+                      ? groupQuantityFor(item.id)
+                      : items.find((e) => e.item.id === item.id)?.quantity ?? 0;
 
                     return (
                       <FoodCard
@@ -207,9 +230,14 @@ export default function MenuPage() {
         onSelect={handleCategorySelect}
       />
 
+      <GroupOrderDrawer
+        restaurantId={restaurantId}
+        tableToken={tableToken}
+      />
+
       <FloatingCart
-        itemCount={totalItems()}
-        total={subtotal()}
+        itemCount={groupActive ? groupTotalItems() : totalItems()}
+        total={groupActive ? groupTotalSubtotal() : subtotal()}
       />
     </main>
   );

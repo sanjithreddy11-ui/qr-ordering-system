@@ -30,12 +30,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>
-        <div className="mx-auto max-w-[480px] relative">
-          <div className="washi-bg" />
-          <div className="relative z-10">{children}</div>
-        </div>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

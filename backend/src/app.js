@@ -4,6 +4,9 @@ const menuRoutes = require("./routes/menuRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const sessionRoutes = require("./routes/sessionRoutes");
 const restaurantRoutes = require("./routes/restaurantRoutes");
+const adminMenuRoutes = require("./routes/adminMenuRoutes");
+const adminTableRoutes = require("./routes/adminTableRoutes");
+const adminStaffRoutes = require("./routes/adminStaffRoutes");
 const ApiError = require("./utils/ApiError");
 
 function createApp(clientOrigin) {
@@ -18,6 +21,9 @@ function createApp(clientOrigin) {
   app.use("/api/orders", orderRoutes);
   app.use("/api/sessions", sessionRoutes);
   app.use("/api/restaurants", restaurantRoutes);
+  app.use("/api/admin/menu", adminMenuRoutes);
+  app.use("/api/admin/tables", adminTableRoutes);
+  app.use("/api/admin/staff", adminStaffRoutes);
 
   // 404
   app.use((req, res) => {
