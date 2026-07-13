@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import Image from "next/image";
 import {
   Flame,
   Clock,
@@ -633,9 +634,15 @@ export default function KitchenDashboardPage() {
             <div className="p-5 border-b border-white/[0.06]">
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#E2622B] to-[#D4A72C] flex items-center justify-center shadow-lg">
-                    <Flame size={18} className="text-white" />
-                  </div>
+                  <div className="w-12 h-12 flex items-center justify-center">
+  <Image
+    src="/logo.png"
+    alt="Lifafa Logo"
+    width={48}
+    height={48}
+    className="rounded-full object-cover"
+  />
+</div>
                   <div>
                     <div className="font-[Space_Grotesk] font-bold text-[15px] text-[#F5F3EC] leading-tight">
                       {RESTAURANT_NAME}

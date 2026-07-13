@@ -55,7 +55,10 @@ export default function GroupOrderDrawer({ restaurantId, tableToken }: GroupOrde
 
   return (
     <>
-      {/* Floating trigger — fixed bottom-left, mirroring the category drawer on the right */}
+      {/* Floating trigger — stacked above the category "Menu" button on the
+          right edge. Deliberately NOT on the left: BackgroundDecor pins a
+          decorative branch illustration to the bottom-left corner, and a
+          button placed there sits visually on top of it. */}
       <motion.button
         type="button"
         aria-label="Group order"
@@ -64,7 +67,7 @@ export default function GroupOrderDrawer({ restaurantId, tableToken }: GroupOrde
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, delay: 0.45, ease: EASE }}
         whileTap={{ scale: 0.95 }}
-        className="fixed bottom-[104px] left-4 z-30 flex items-center gap-1.5 rounded-full border border-border-soft bg-bg-secondary px-4 py-2.5"
+        className="fixed bottom-[172px] right-4 z-30 flex items-center gap-1.5 rounded-full border border-border-soft bg-bg-secondary px-4 py-2.5"
         style={{ boxShadow: "0 6px 16px rgba(0,0,0,0.07)" }}
       >
         <Users size={14} strokeWidth={1.75} className="text-green-primary" />

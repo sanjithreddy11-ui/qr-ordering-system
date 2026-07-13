@@ -131,7 +131,7 @@ export default function MenuPage() {
   };
 
   return (
-    <main className="relative min-h-dvh overflow-x-clip pb-32">
+    <main className="relative min-h-dvh pb-32">
       <BackgroundDecor />
 
       {/* Back button — replaces the bottom nav on this page, since the
