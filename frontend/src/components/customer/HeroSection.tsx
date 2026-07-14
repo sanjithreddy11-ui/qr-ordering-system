@@ -50,14 +50,14 @@ export default function HeroSection({
 
       {/* Video block */}
       <div
-        className="relative h-[68dvh] w-full overflow-hidden"
+        className="relative h-[78vh] w-full overflow-hidden"
         style={{
           clipPath: "url(#heroOrganicClip)",
           filter: "drop-shadow(0 18px 30px rgba(0,0,0,0.16))",
         }}
       >
         <video
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover object-[center_25%]"
           src={videoSrc}
           autoPlay
           muted
