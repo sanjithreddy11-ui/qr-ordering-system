@@ -50,7 +50,7 @@ export default function HeroSection({
 
       {/* Video block */}
       <div
-        className="relative h-[60vh] w-full overflow-hidden"
+        className="relative h-[63vh] w-full overflow-hidden"
         style={{
           clipPath: "url(#heroOrganicClip)",
           filter: "drop-shadow(0 18px 30px rgba(0,0,0,0.16))",
@@ -105,28 +105,14 @@ export default function HeroSection({
           animate={{ y: [0, -6, 0], rotate: [0, -2, 0] }}
           transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
         >
-          <Image
-            src="/new-assets/top-left-flower.png"
-            alt=""
-            width={92}
-            height={105}
-            aria-hidden
-            className="h-auto w-[150px]"
-          />
+         
         </motion.div>
         <motion.div
           className="pointer-events-none absolute -right-4 -top-6"
           animate={{ y: [0, -6, 0], rotate: [0, 2, 0] }}
           transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 0.4 }}
         >
-          <Image
-            src="/new-assets/top-right-flower.png"
-            alt=""
-            width={92}
-            height={105}
-            aria-hidden
-            className="h-auto w-[132px]"
-          />
+         
         </motion.div>
 
         <p className="font-script mt-2 text-4xl leading-none text-green-secondary">
