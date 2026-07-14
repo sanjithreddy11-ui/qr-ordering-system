@@ -20,12 +20,13 @@ export interface HeroSectionProps {
 
 /**
  * Section 1 — Hero.
- * Full-bleed autoplay video that dominates the first screen (~68dvh —
- * the video should read as most of the initial view, with only the
- * logo medallion + "Welcome To" line peeking in below it, matching the
- * reference), large rounded bottom corners, a circular profile button
- * floating top-right on the video, and a logo medallion straddling the
- * seam between the video and the paper-texture body below it.
+ * Full-bleed autoplay video that dominates the first screen (~68dvh), cut
+ * along an organic asymmetric curve at the bottom (left edge runs the
+ * full height, right edge lifts away earlier) via an objectBoundingBox
+ * SVG clip-path — this is what makes the hero feel stitched into the
+ * paper section below rather than two stacked rectangles. A logo
+ * medallion straddles that seam, and the "Welcome To" line uses a
+ * calligraphy script face for a fine-dining feel.
  */
 export default function HeroSection({
   videoSrc,
@@ -37,8 +38,24 @@ export default function HeroSection({
 }: HeroSectionProps) {
   return (
     <section className="relative w-full">
-      {/* Video block — sized to dominate the first screen, like the reference */}
-      <div className="relative h-[68dvh] w-full overflow-hidden rounded-b-[44px] shadow-lg">
+      {/* Hidden SVG defining the asymmetric hero clip-path. objectBoundingBox
+          units (0–1) keep it fully responsive regardless of viewport width. */}
+      <svg width="0" height="0" className="absolute" aria-hidden>
+        <defs>
+          <clipPath id="heroOrganicClip" clipPathUnits="objectBoundingBox">
+            <path d="M0,0 L1,0 L1,0.72 C0.75,0.88 0.35,1 0,1 Z" />
+          </clipPath>
+        </defs>
+      </svg>
+
+      {/* Video block */}
+      <div
+        className="relative h-[68dvh] w-full overflow-hidden"
+        style={{
+          clipPath: "url(#heroOrganicClip)",
+          filter: "drop-shadow(0 18px 30px rgba(0,0,0,0.16))",
+        }}
+      >
         <video
           className="h-full w-full object-cover"
           src={videoSrc}
@@ -47,25 +64,20 @@ export default function HeroSection({
           loop
           playsInline
         />
-
-        <button
-          type="button"
-          onClick={onProfileClick}
-          aria-label="Profile"
-          className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/90 shadow-md backdrop-blur-sm transition-transform active:scale-95"
-        >
-          <User size={20} style={{ color: "var(--green-deep)" }} />
-        </button>
       </div>
 
+     
       {/* Floating logo — overlaps the video/paper seam */}
       <div className="relative z-10 flex justify-center">
         <motion.div
           initial={{ opacity: 0, y: 12, scale: 0.94 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.5 }}
-          className="-mt-14 flex h-28 w-28 items-center justify-center overflow-hidden rounded-3xl bg-white p-2"
-          style={{ boxShadow: "0 12px 28px rgba(0,0,0,0.18)" }}
+          className="-mt-20 flex h-28 w-28 items-center justify-center overflow-hidden rounded-3xl bg-white p-2"
+          style={{
+            boxShadow:
+              "0 22px 48px rgba(0,0,0,0.16), 0 8px 18px rgba(0,0,0,0.08)",
+          }}
         >
           <Image
             src={logo}
@@ -83,12 +95,13 @@ export default function HeroSection({
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.4 }}
         transition={{ duration: 0.5 }}
-        className="relative mx-auto flex max-w-[480px] flex-col items-center px-8 pb-2 pt-4 text-center"
+        className="relative mx-auto flex max-w-[480px] flex-col items-center px-6 pb-2 pt-3 text-center"
       >
-        {/* Flower accents — full opacity, with a slow ambient float so they
-            read as a living detail rather than a flat sticker. */}
+        {/* Flower accents — deliberately asymmetric: left sits lower and
+            reaches further in, right sits higher and tighter, each with a
+            slow ambient float so they read as alive rather than a sticker. */}
         <motion.div
-          className="pointer-events-none absolute -left-1 -top-1"
+          className="pointer-events-none absolute -left-4 top-[34px]"
           animate={{ y: [0, -6, 0], rotate: [0, -2, 0] }}
           transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
         >
@@ -98,11 +111,11 @@ export default function HeroSection({
             width={92}
             height={105}
             aria-hidden
-            className="h-auto w-[96px]"
+            className="h-auto w-[150px]"
           />
         </motion.div>
         <motion.div
-          className="pointer-events-none absolute -right-1 -top-1"
+          className="pointer-events-none absolute -right-4 -top-6"
           animate={{ y: [0, -6, 0], rotate: [0, 2, 0] }}
           transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 0.4 }}
         >
@@ -112,14 +125,14 @@ export default function HeroSection({
             width={92}
             height={105}
             aria-hidden
-            className="h-auto w-[96px]"
+            className="h-auto w-[132px]"
           />
         </motion.div>
 
-        <p className="font-display mb-1 text-2xl italic text-green-secondary">
+        <p className="font-script mt-2 text-4xl leading-none text-green-secondary">
           Welcome To
         </p>
-        <h1 className="font-display mb-4 text-4xl font-semibold leading-tight text-green-deep">
+        <h1 className="font-display mb-4 mt-2 text-4xl font-semibold leading-tight text-green-deep">
           {restaurantName}
         </h1>
 

@@ -86,15 +86,11 @@ export default function CustomerTabsLayout({ children }: { children: React.React
   }, [pathname, tableToken, sessionReady]);
 
   const lastSegment = getLastPathSegment(pathname);
-  const showBottomNav = sessionReady && !NAV_HIDDEN_SEGMENTS.includes(lastSegment);
-
-  // TEMPORARY — open your browser devtools console on the menu page and
-  // check this line. If lastSegment doesn't say "menu", or showBottomNav
-  // says true, that tells us exactly what's going wrong. Remove this
-  // console.log once the bottom nav is confirmed hidden correctly.
-  if (typeof window !== "undefined") {
-    console.log("[nav-debug] pathname:", pathname, "| lastSegment:", lastSegment, "| showBottomNav:", showBottomNav);
-  }
+  const pathSegments = pathname ? pathname.split("/").filter(Boolean) : [];
+  // Home page is exactly "/[restaurantId]" — one segment, no sub-route.
+  const isHomePage = pathSegments.length === 1;
+  const showBottomNav =
+    sessionReady && !isHomePage && !NAV_HIDDEN_SEGMENTS.includes(lastSegment);
 
   return (
     <div className="relative min-h-dvh bg-bg-primary pb-20">

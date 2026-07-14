@@ -29,6 +29,7 @@
 
   --font-display: "Cormorant Garamond", serif;
   --font-body: "Inter", sans-serif;
+  --font-script: "Mrs Saint Delafield", cursive;
 }
 
 * {
@@ -58,6 +59,12 @@ body {
 
 .font-display {
   font-family: "Cormorant Garamond", serif;
+}
+
+/* Elegant fine-dining calligraphy — used only for the "Welcome To" line,
+   kept separate from the display serif used for the restaurant name. */
+.font-script {
+  font-family: "Mrs Saint Delafield", cursive;
 }
 
 /* Small gold diamond divider, used between the name/tagline blocks */
