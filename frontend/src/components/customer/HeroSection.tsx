@@ -4,6 +4,8 @@ import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { User } from "lucide-react";
+import { Parisienne, Bodoni_Moda } from "next/font/google";
+
 
 export interface HeroSectionProps {
   /** Path under /public to the looping hero video, e.g. "/new-assets/floral.mp4" */
@@ -28,6 +30,15 @@ export interface HeroSectionProps {
  * medallion straddles that seam, and the "Welcome To" line uses a
  * calligraphy script face for a fine-dining feel.
  */
+const parisienne= Parisienne({
+  weight: "400",
+  subsets: ["latin"],
+});
+
+const cormorant = Bodoni_Moda({
+  weight: ["500", "600"],
+  subsets: ["latin"],
+});
 export default function HeroSection({
   videoSrc,
   logo,
@@ -114,14 +125,17 @@ export default function HeroSection({
         >
          
         </motion.div>
+        <p
+  className={`${parisienne.className} mt-2 text-[44px] leading-none text-green-secondary`}
+>
+  Welcome To
+</p>
 
-        <p className="font-script mt-2 text-4xl leading-none text-green-secondary">
-          Welcome To
-        </p>
-        <h1 className="font-display mb-4 mt-2 text-4xl font-semibold leading-tight text-green-deep">
-          {restaurantName}
-        </h1>
-
+<h1
+  className={`${cormorant.className} mb-4 mt-2 text-[48px] font-semibold leading-tight text-green-deep`}
+>
+  {restaurantName}
+</h1>
         <p className="font-body max-w-xs text-sm leading-relaxed text-text-secondary">
           {tagline}
         </p>

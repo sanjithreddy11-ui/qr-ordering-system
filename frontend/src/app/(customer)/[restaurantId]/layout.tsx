@@ -91,7 +91,6 @@ export default function CustomerTabsLayout({ children }: { children: React.React
   const isHomePage = pathSegments.length === 1;
   const showBottomNav =
     sessionReady && !isHomePage && !NAV_HIDDEN_SEGMENTS.includes(lastSegment);
-
   return (
     <div className="relative min-h-dvh bg-bg-primary pb-20">
       <CategoryMenuBackButton />

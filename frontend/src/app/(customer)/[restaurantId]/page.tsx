@@ -17,12 +17,9 @@ import InformationSection, {
 // still fetches its own data as before). Edit these values directly to
 // rebrand: swap copy, swap /new-assets/* paths, done.
 const restaurant = {
-  name: "Lifafa Cafe & Bistro",
+  name: "Ebowla Club",
   logo: "/logo.png",
-  tagline: "a quiet table, thoughtfully set",
-  description:
-    "A cozy neighborhood cafe serving fresh, seasonal comfort food and specialty drinks.",
-
+  tagline: "A place where the ordinary ends, and the extraordinary begins!",
   heroVideo: "/new-assets/floral.mp4",
 
   aboutSubtitle: "Discover the story behind Lifafa",
@@ -103,7 +100,6 @@ export default function CafeLandingPage() {
         logo={restaurant.logo}
         restaurantName={restaurant.name}
         tagline={restaurant.tagline}
-        description={restaurant.description}
       />
 
       <AboutCafeSection
