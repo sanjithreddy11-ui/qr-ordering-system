@@ -7,7 +7,6 @@ import OrderSummaryRow from "@/components/customer/OrderSummaryRow";
 import { useSessionStore } from "@/store/session-store";
 import { fetchOrdersBySession } from "@/lib/api";
 import type { Order } from "@/types/order";
-import BackgroundDecor2 from "@/components/customer/BackgroundDecor2";
 import { Receipt } from "lucide-react";
 
 export default function PastOrdersPage() {
@@ -24,8 +23,15 @@ export default function PastOrdersPage() {
   }, [sessionId]);
 
   return (
-    <main className="relative min-h-dvh overflow-x-hidden pb-8">
-      <BackgroundDecor2 />
+   <main
+      className="relative min-h-dvh overflow-x-hidden pb-10"
+      style={{
+        backgroundImage: "url('/new-assets/paper-texture.webp')",
+        backgroundRepeat: "repeat",
+        backgroundSize: "480px auto",
+        backgroundColor: "var(--bg-primary)",
+      }}
+    >
 
       <div className="relative z-10 mx-auto max-w-[480px] px-4 pt-8">
         <h1 className="font-display mb-1 text-3xl font-semibold text-text-primary">Past Orders</h1>

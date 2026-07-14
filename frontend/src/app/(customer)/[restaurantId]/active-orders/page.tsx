@@ -10,7 +10,6 @@ import { useBuildCustomerUrl } from "@/lib/customer-nav";
 import { fetchOrdersBySession } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
 import type { Order } from "@/types/order";
-import BackgroundDecor2 from "@/components/customer/BackgroundDecor2";
 import { UtensilsCrossed } from "lucide-react";
 
 export default function ActiveOrdersPage() {
@@ -59,9 +58,15 @@ export default function ActiveOrdersPage() {
   }, [sessionId]);
 
   return (
-    <main className="relative min-h-dvh overflow-x-hidden pb-8">
-      <BackgroundDecor2 />
-
+   <main
+      className="relative min-h-dvh overflow-x-hidden"
+      style={{
+        backgroundImage: "url('/new-assets/paper-texture.webp')",
+        backgroundRepeat: "repeat",
+        backgroundSize: "480px auto",
+        backgroundColor: "var(--bg-primary)",
+      }}
+    >
       <div className="relative z-10 mx-auto max-w-[480px] px-4 pt-8">
         <h1 className="font-display mb-1 text-3xl font-semibold text-text-primary">Active Orders</h1>
         <p className="font-body mb-6 text-sm text-text-secondary">Orders from your current visit</p>

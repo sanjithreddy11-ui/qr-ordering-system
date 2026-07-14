@@ -95,10 +95,9 @@ body {
   position: absolute;
   inset: 0;
 
-  background-image: url("/assets/paper-texture.svg");
+  background-image: url("/new-assets/paper-texture.webp");
   background-size: 300px 300px;
   background-repeat: repeat;
-
   opacity: 0.10;
   pointer-events: none;
   z-index: 0;

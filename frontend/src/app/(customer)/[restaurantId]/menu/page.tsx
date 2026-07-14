@@ -2,7 +2,7 @@
 
 import { useMemo, useCallback, useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Users } from "lucide-react";
 import BackgroundDecor from "@/components/customer/BackgroundDecor";
 import RestaurantHeader from "@/components/customer/RestaurantHeader";
 import SearchBar from "@/components/customer/SearchBar";
@@ -31,6 +31,7 @@ export default function MenuPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterValue>("all");
   const [liveMenu, setLiveMenu] = useState<MenuCategory[] | null>(null);
+  const [groupOrderOpen, setGroupOrderOpen] = useState(false);
 
   const {
     items,
@@ -43,6 +44,7 @@ export default function MenuPage() {
 
   const {
     active: groupActive,
+    participants,
     addItem: groupAddItem,
     removeItem: groupRemoveItem,
     quantityFor: groupQuantityFor,
@@ -163,11 +165,37 @@ export default function MenuPage() {
       <div className="relative z-10">
         <RestaurantHeader />
 
-        <div className="sticky top-0 z-30 space-y-3 bg-bg-primary/90 px-6 pb-4 pt-2 backdrop-blur-[2px]">
-          <SearchBar
-            value={search}
-            onChange={setSearch}
-          />
+        {/* Sticky search + filter header. Pinned to the top of the
+            viewport on scroll — bg + blur so content scrolling underneath
+            never shows through. z-30 keeps it above menu content but below
+            the back button (z-[1100]) and drawers (z-40/50). */}
+        <div className="sticky top-0 z-30 space-y-3 bg-bg-primary/95 px-6 pb-4 pt-2 backdrop-blur-md">
+          <div className="flex items-center gap-2.5">
+            <div className="min-w-0 flex-1">
+              <SearchBar value={search} onChange={setSearch} />
+            </div>
+
+            {/* Group order trigger — beside the search bar instead of
+                floating separately over the menu content. */}
+            <motion.button
+              type="button"
+              aria-label="Group order"
+              onClick={() => setGroupOrderOpen(true)}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
+              whileTap={{ scale: 0.95 }}
+              className="relative flex h-[52px] shrink-0 items-center justify-center rounded-[22px] border border-border-soft bg-bg-secondary px-3.5"
+              style={{ boxShadow: "0 6px 20px rgba(0,0,0,0.04)" }}
+            >
+              <Users size={18} strokeWidth={1.75} className="text-green-primary" />
+              {groupActive && (
+                <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-green-primary px-1 text-[9px] font-bold text-bg-primary">
+                  {participants.length}
+                </span>
+              )}
+            </motion.button>
+          </div>
 
           <FilterTabs
             value={filter}
@@ -233,6 +261,8 @@ export default function MenuPage() {
       <GroupOrderDrawer
         restaurantId={restaurantId}
         tableToken={tableToken}
+        open={groupOrderOpen}
+        onClose={() => setGroupOrderOpen(false)}
       />
 
       <FloatingCart
