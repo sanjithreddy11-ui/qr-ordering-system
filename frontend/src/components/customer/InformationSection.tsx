@@ -44,7 +44,6 @@ export interface InformationSectionProps {
   hours: OpeningHoursRow[];
   contact: ContactDetails;
   social: SocialLinks;
-  business: BusinessDetails;
 }
 
 const SOCIAL_META: Record<
@@ -80,7 +79,6 @@ export default function InformationSection({
   hours,
   contact,
   social,
-  business,
 }: InformationSectionProps) {
   const socialEntries = (Object.keys(SOCIAL_META) as (keyof SocialLinks)[]).filter(
     (key) => social[key]
@@ -173,47 +171,16 @@ export default function InformationSection({
       )}
 
       {/* Registered Business Details */}
-      <div>
-        <SectionHeading>Registered Business Details</SectionHeading>
-        <div className="font-body flex flex-col gap-2 text-sm text-text-primary">
-          <p>
-            <span className="text-text-secondary">Place Name: </span>
-            {business.placeName}
-          </p>
-          {business.gstNumber && (
-            <p>
-              <span className="text-text-secondary">GST Number: </span>
-              {business.gstNumber}
-            </p>
-          )}
-          {business.fssaiNumber && (
-            <p>
-              <span className="text-text-secondary">FSSAI Number: </span>
-              {business.fssaiNumber}
-            </p>
-          )}
-          <p>
-            <span className="text-text-secondary">Registered Name: </span>
-            {business.registeredName}
-          </p>
-          <p>
-            <span className="text-text-secondary">Address: </span>
-            {business.address}
-          </p>
-        </div>
-      </div>
 
       {/* Footer decoration */}
-      <div className="mt-12 flex justify-center">
-        <Image
-          src="/new-assets/flower-bottom.png"
-          alt=""
-          width={345}
-          height={146}
-          aria-hidden
-          className="pointer-events-none h-auto w-[220px] opacity-90"
-        />
-      </div>
+    <Image
+  src="/new-assets/flower-bottom.png"
+  alt=""
+  width={345}
+  height={146}
+  aria-hidden
+  className="pointer-events-none h-auto w-[300px] self-start -ml-6 opacity-90"
+/>
     </motion.section>
   );
 }

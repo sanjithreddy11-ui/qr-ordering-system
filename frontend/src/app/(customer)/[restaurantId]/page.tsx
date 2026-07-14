@@ -21,10 +21,8 @@ const restaurant = {
   logo: "/logo.png",
   tagline: "A place where the ordinary ends, and the extraordinary begins!",
   heroVideo: "/new-assets/floral.mp4",
-
-  aboutSubtitle: "Discover the story behind Lifafa",
   aboutText:
-    "Lifafa is more than just a café—it's an experience rooted in warmth, flavor, and community. Inspired by the joy of sharing good food and meaningful moments, we bring you a menu crafted with passion, served with love.",
+    "Ebowla is more than just a club—it's an experience rooted in warmth, flavor, and community. Inspired by the joy of sharing good food and meaningful moments, we bring you a menu crafted with passion, served with love.",
 
   highlights: [
     { label: "Fresh Ingredients", icon: Leaf },
@@ -55,8 +53,8 @@ const restaurant = {
 
   // TODO: replace with real contact details.
   contact: {
-    phone: "+91-9728006969",
-    address: "Uppal, Hyderabad",
+    phone: "+91-7569442081",
+    address: "Mumbai, India",
   },
 
   // TODO: add real social/profile URLs. Any key left undefined is hidden.
@@ -66,7 +64,7 @@ const restaurant = {
 
   // TODO: replace with real registration details before launch.
   business: {
-    placeName: "Lifafa Cafe & Bistro",
+    placeName: "E-Bowla Club",
     gstNumber: "",
     fssaiNumber: "",
     registeredName: "Lifafa Cafe & Bistro",
@@ -103,7 +101,6 @@ export default function CafeLandingPage() {
       />
 
       <AboutCafeSection
-        subtitle={restaurant.aboutSubtitle}
         description={restaurant.aboutText}
         highlights={restaurant.highlights}
         onExploreMenu={goToMenu}

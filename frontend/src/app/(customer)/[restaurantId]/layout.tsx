@@ -9,10 +9,9 @@ import BottomNav from "@/components/customer/BottomNav";
 import CategoryMenuBackButton from "@/components/customer/CategoryMenuBackButton";
 
 // Bottom nav is hidden on the linear checkout flow (cart/checkout/
-// order-success) AND on the menu page itself — the menu has its own
-// floating category-jump button, so a persistent top-left back button
-// replaces the bottom nav there instead.
-const NAV_HIDDEN_SEGMENTS = ["cart", "checkout", "order-success", "menu"];
+// order-success) and on Home (handled separately via isHomePage below).
+// It stays visible on Menu, Active Orders, and Past Orders.
+const NAV_HIDDEN_SEGMENTS = ["cart", "checkout", "order-success"];
 
 function getLastPathSegment(pathname: string | null): string {
   if (!pathname) return "";

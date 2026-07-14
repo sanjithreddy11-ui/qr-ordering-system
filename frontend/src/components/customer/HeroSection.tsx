@@ -146,13 +146,13 @@ export default function HeroSection({
         )}
 
         <Image
-          src="/new-assets/flower-divider.png"
-          alt=""
-          width={808}
-          height={348}
-          aria-hidden
-          className="pointer-events-none mt-6 h-auto w-full max-w-[320px]"
-        />
+  src="/new-assets/flower-divider.png"
+  alt=""
+  width={808}
+  height={348}
+  aria-hidden
+  className="pointer-events-none mt-6 h-auto w-full max-w-[380px] self-end -mr-6 translate-x-2"
+/>
       </motion.div>
     </section>
   );

@@ -3,6 +3,7 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export interface EventItem {
   id: string;
@@ -19,7 +20,8 @@ export interface EventsSectionProps {
 /**
  * Section 3 — "Happening Events".
  * Horizontal swipeable carousel (native CSS scroll-snap, no new
- * dependency) with dot page indicators that track scroll position.
+ * dependency) with dot page indicators and left/right arrow buttons
+ * that both track and drive scroll position.
  */
 export default function EventsSection({
   heading = "Happening Events",
@@ -50,6 +52,9 @@ export default function EventsSection({
     track.scrollTo({ left: index * track.clientWidth, behavior: "smooth" });
   };
 
+  const goPrev = () => goToSlide(Math.max(activeIndex - 1, 0));
+  const goNext = () => goToSlide(Math.min(activeIndex + 1, events.length - 1));
+
   if (events.length === 0) return null;
 
   return (
@@ -58,7 +63,7 @@ export default function EventsSection({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
       transition={{ duration: 0.5 }}
-      className="relative mx-auto max-w-[480px] px-6 py-10"
+      className="relative mx-auto max-w-[480px] px-7 py-10"
     >
       <Image
         src="/new-assets/flower-event-left.png"
@@ -84,26 +89,51 @@ export default function EventsSection({
         <p className="font-body mb-7 text-sm text-text-secondary">{subtitle}</p>
       </div>
 
-      <div
-        ref={trackRef}
-        className="flex w-full snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-1"
-        style={{ scrollbarWidth: "none" }}
-      >
-        {events.map((event) => (
-          <div
-            key={event.id}
-            className="aspect-[4/5] w-full flex-none snap-center overflow-hidden rounded-3xl"
-            style={{ boxShadow: "0 12px 28px rgba(0,0,0,0.16)" }}
+      <div className="relative">
+        <div
+          ref={trackRef}
+          className="flex w-full snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-1"
+          style={{ scrollbarWidth: "none" }}
+        >
+          {events.map((event) => (
+            <div
+              key={event.id}
+              className="aspect-[4/5] w-full flex-none snap-center overflow-hidden rounded-3xl"
+              style={{ boxShadow: "0 12px 28px rgba(0,0,0,0.16)" }}
+            >
+              <Image
+                src={event.image}
+                alt={event.alt}
+                width={600}
+                height={750}
+                className="h-full w-full object-cover"
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Prev / next arrows — vertically centered over the card,
+            hidden once you're at the first/last slide. */}
+        {activeIndex > 0 && (
+          <button
+            type="button"
+            aria-label="Previous event"
+            onClick={goPrev}
+            className="absolute left-1 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-green-deep shadow-md transition hover:bg-white"
           >
-            <Image
-              src={event.image}
-              alt={event.alt}
-              width={600}
-              height={750}
-              className="h-full w-full object-cover"
-            />
-          </div>
-        ))}
+            <ChevronLeft size={20} />
+          </button>
+        )}
+        {activeIndex < events.length - 1 && (
+          <button
+            type="button"
+            aria-label="Next event"
+            onClick={goNext}
+            className="absolute right-1 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-green-deep shadow-md transition hover:bg-white"
+          >
+            <ChevronRight size={20} />
+          </button>
+        )}
       </div>
 
       <div className="mt-5 flex items-center justify-center gap-2">
