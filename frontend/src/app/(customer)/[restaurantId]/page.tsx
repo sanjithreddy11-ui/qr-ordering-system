@@ -1,5 +1,4 @@
 "use client";
-
 import React from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
