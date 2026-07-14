@@ -16,7 +16,7 @@ export default function RestaurantHeader() {
           className="font-display text-[34px] font-semibold text-green-primary"
           style={{ letterSpacing: "2px" }}
         >
-          LIFAFA
+          E-BOWLA CLUB
         </h1>
         <Image
           src="/assets/hanko.svg"
