@@ -20,10 +20,12 @@ export interface HeroSectionProps {
 
 /**
  * Section 1 — Hero.
- * Full-bleed autoplay video (~45vh, large rounded bottom corners), a
- * circular profile button floating top-right on the video, and a logo
- * medallion straddling the seam between the video and the paper-texture
- * body below it. Welcome copy + flower dividers sit underneath.
+ * Full-bleed autoplay video that dominates the first screen (~68dvh —
+ * the video should read as most of the initial view, with only the
+ * logo medallion + "Welcome To" line peeking in below it, matching the
+ * reference), large rounded bottom corners, a circular profile button
+ * floating top-right on the video, and a logo medallion straddling the
+ * seam between the video and the paper-texture body below it.
  */
 export default function HeroSection({
   videoSrc,
@@ -35,8 +37,8 @@ export default function HeroSection({
 }: HeroSectionProps) {
   return (
     <section className="relative w-full">
-      {/* Video block */}
-      <div className="relative h-[45vh] w-full overflow-hidden rounded-b-[40px] shadow-lg">
+      {/* Video block — sized to dominate the first screen, like the reference */}
+      <div className="relative h-[68dvh] w-full overflow-hidden rounded-b-[44px] shadow-lg">
         <video
           className="h-full w-full object-cover"
           src={videoSrc}
@@ -81,24 +83,38 @@ export default function HeroSection({
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.4 }}
         transition={{ duration: 0.5 }}
-        className="relative mx-auto flex max-w-[480px] flex-col items-center px-8 pb-2 pt-6 text-center"
+        className="relative mx-auto flex max-w-[480px] flex-col items-center px-8 pb-2 pt-4 text-center"
       >
-        <Image
-          src="/new-assets/top-left-flower.png"
-          alt=""
-          width={92}
-          height={105}
-          aria-hidden
-          className="pointer-events-none absolute left-0 top-2 h-auto w-[80px] opacity-90"
-        />
-        <Image
-          src="/new-assets/top-right-flower.png"
-          alt=""
-          width={92}
-          height={105}
-          aria-hidden
-          className="pointer-events-none absolute right-0 top-2 h-auto w-[80px] opacity-90"
-        />
+        {/* Flower accents — full opacity, with a slow ambient float so they
+            read as a living detail rather than a flat sticker. */}
+        <motion.div
+          className="pointer-events-none absolute -left-1 -top-1"
+          animate={{ y: [0, -6, 0], rotate: [0, -2, 0] }}
+          transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+        >
+          <Image
+            src="/new-assets/top-left-flower.png"
+            alt=""
+            width={92}
+            height={105}
+            aria-hidden
+            className="h-auto w-[96px]"
+          />
+        </motion.div>
+        <motion.div
+          className="pointer-events-none absolute -right-1 -top-1"
+          animate={{ y: [0, -6, 0], rotate: [0, 2, 0] }}
+          transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 0.4 }}
+        >
+          <Image
+            src="/new-assets/top-right-flower.png"
+            alt=""
+            width={92}
+            height={105}
+            aria-hidden
+            className="h-auto w-[96px]"
+          />
+        </motion.div>
 
         <p className="font-display mb-1 text-2xl italic text-green-secondary">
           Welcome To
@@ -122,7 +138,7 @@ export default function HeroSection({
           width={808}
           height={348}
           aria-hidden
-          className="pointer-events-none mt-6 h-auto w-full max-w-[320px] opacity-95"
+          className="pointer-events-none mt-6 h-auto w-full max-w-[320px]"
         />
       </motion.div>
     </section>
