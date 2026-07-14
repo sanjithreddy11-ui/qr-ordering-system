@@ -180,7 +180,7 @@ export default function InformationSection({
   height={146}
   aria-hidden
   className="pointer-events-none h-auto w-[300px] self-start -ml-6 opacity-90"
-/>
+/> 
     </motion.section>
   );
 }

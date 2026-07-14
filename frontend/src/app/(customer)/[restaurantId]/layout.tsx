@@ -9,9 +9,10 @@ import BottomNav from "@/components/customer/BottomNav";
 import CategoryMenuBackButton from "@/components/customer/CategoryMenuBackButton";
 
 // Bottom nav is hidden on the linear checkout flow (cart/checkout/
-// order-success) and on Home (handled separately via isHomePage below).
-// It stays visible on Menu, Active Orders, and Past Orders.
-const NAV_HIDDEN_SEGMENTS = ["cart", "checkout", "order-success"];
+// order-success) AND on the menu page itself — the menu has its own
+// floating category-jump button, so a persistent top-left back button
+// replaces the bottom nav there instead.
+const NAV_HIDDEN_SEGMENTS = ["cart", "checkout", "order-success", "menu"];
 
 function getLastPathSegment(pathname: string | null): string {
   if (!pathname) return "";
@@ -85,11 +86,8 @@ export default function CustomerTabsLayout({ children }: { children: React.React
   }, [pathname, tableToken, sessionReady]);
 
   const lastSegment = getLastPathSegment(pathname);
-  const pathSegments = pathname ? pathname.split("/").filter(Boolean) : [];
-  // Home page is exactly "/[restaurantId]" — one segment, no sub-route.
-  const isHomePage = pathSegments.length === 1;
-  const showBottomNav =
-    sessionReady && !isHomePage && !NAV_HIDDEN_SEGMENTS.includes(lastSegment);
+  const showBottomNav = sessionReady && !NAV_HIDDEN_SEGMENTS.includes(lastSegment);
+
   return (
     <div className="relative min-h-dvh bg-bg-primary pb-20">
       <CategoryMenuBackButton />

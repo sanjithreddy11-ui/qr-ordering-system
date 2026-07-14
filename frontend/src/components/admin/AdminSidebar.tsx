@@ -45,7 +45,7 @@ export default function AdminSidebar() {
             color: "#1C1C1C",
           }}
         >
-          Lifafa
+          
         </div>
         <div
           style={{

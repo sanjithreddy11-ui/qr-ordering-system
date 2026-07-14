@@ -32,15 +32,15 @@ const restaurant = {
   ] satisfies AboutHighlight[],
 
   events: [
-    { id: "event-1", image: "/new-assets/events/event-1.webp", alt: "Upcoming event at Lifafa" },
-    { id: "event-2", image: "/new-assets/events/event-2.webp", alt: "Upcoming event at Lifafa" },
-    { id: "event-3", image: "/new-assets/events/event-3.webp", alt: "Upcoming event at Lifafa" },
-    { id: "event-4", image: "/new-assets/events/event-4.webp", alt: "Upcoming event at Lifafa" },
-    { id: "event-5", image: "/new-assets/events/event-5.webp", alt: "Upcoming event at Lifafa" },
+    { id: "event-1", image: "/new-assets/events/event-1.webp", alt: "Upcoming event at E-BOWLA CLUB" },
+    { id: "event-2", image: "/new-assets/events/event-2.webp", alt: "Upcoming event at E-BOWLA CLUB" },
+    { id: "event-3", image: "/new-assets/events/event-3.webp", alt: "Upcoming event at E-BOWLA CLUB" },
+    { id: "event-4", image: "/new-assets/events/event-4.webp", alt: "Upcoming event at E-BOWLA CLUB" },
+    { id: "event-5", image: "/new-assets/events/event-5.webp", alt: "Upcoming event at E-BOWLA CLUB" },
   ] satisfies EventItem[],
 
   // TODO: confirm real values — placeholders below follow the reference's
-  // format (Mon–Sun, same hours daily) but with Lifafa's own timing.
+  // format (Mon–Sun, same hours daily) but with E-BOWLA CLUB's own timing.
   hours: [
     { day: "Mon", hours: "8:00 AM – 11:00 PM" },
     { day: "Tue", hours: "8:00 AM – 11:00 PM" },
@@ -63,13 +63,6 @@ const restaurant = {
   },
 
   // TODO: replace with real registration details before launch.
-  business: {
-    placeName: "E-Bowla Club",
-    gstNumber: "",
-    fssaiNumber: "",
-    registeredName: "Lifafa Cafe & Bistro",
-    address: "Uppal, Hyderabad",
-  },
 };
 
 export default function CafeLandingPage() {
@@ -112,7 +105,6 @@ export default function CafeLandingPage() {
         hours={restaurant.hours}
         contact={restaurant.contact}
         social={restaurant.social}
-        business={restaurant.business}
       />
     </main>
   );
