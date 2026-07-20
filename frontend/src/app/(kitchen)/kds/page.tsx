@@ -645,7 +645,7 @@ export default function KitchenDashboardPage() {
 </div>
                   <div>
                     <div className="font-[Space_Grotesk] font-bold text-[15px] text-[#F5F3EC] leading-tight">
-                      {RESTAURANT_NAME}
+                      E-BOWLA CLUB
                     </div>
                     <div className="flex items-center gap-1 text-[10px] font-semibold text-[#22A65A] uppercase tracking-wider">
                       <span className="w-1.5 h-1.5 rounded-full bg-[#22A65A] animate-pulse" />
