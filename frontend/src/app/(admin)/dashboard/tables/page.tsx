@@ -1,191 +1,273 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
-import { Plus, Trash2, Download, Power } from "lucide-react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { Search } from "lucide-react";
+import { PageHeader, adminColors } from "@/components/admin/ui";
+import { getSocket } from "@/lib/socket";
 import {
-  PageHeader,
-  Card,
-  PrimaryButton,
-  SecondaryButton,
-  TextInput,
-  Badge,
-  Modal,
-  adminColors,
-} from "@/components/admin/ui";
-import {
-  fetchAdminTables,
-  createAdminTable,
-  updateAdminTable,
-  deleteAdminTable,
-  AdminTable,
+  fetchTableGrid,
+  fetchTableAnalytics,
+  type TableGridItem,
+  type TableAnalyticsData,
+  type TableStatus,
 } from "@/lib/admin-api";
+import TableCard from "@/components/admin/tables/TableCard";
+import TableDetailsDrawer from "@/components/admin/tables/TableDetailsDrawer";
+import ReservationForm from "@/components/admin/tables/ReservationForm";
+import TableAnalyticsPanel from "@/components/admin/tables/TableAnalyticsPanel";
+import ReservationCalendar from "@/components/admin/tables/ReservationCalendar";
+import QrCodesTab from "@/components/admin/tables/QrCodesTab";
+import { STATUS_FILTERS, STATUS_META } from "@/components/admin/tables/tableStatus";
 
 const RESTAURANT_ID = "lifafa"; // TODO: make dynamic if you support multiple restaurants
 
-// Free QR image generator — renders a scannable QR code for any URL with
-// no extra npm dependency or backend work. Fine for a demo; if you outgrow
-// reliance on a third-party service, swap this for a self-hosted QR
-// library (e.g. `qrcode` on the backend) later.
-function qrImageUrl(targetUrl: string) {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(targetUrl)}`;
-}
+type Tab = "grid" | "reservations" | "qr";
+
+// Socket events that should trigger a live refresh of the table grid /
+// analytics. Kept as a flat list so adding a new emit on the backend only
+// means adding one string here.
+const LIVE_EVENTS = [
+  "tableOccupied",
+  "tableReserved",
+  "tableAvailable",
+  "tableCleaning",
+  "tableBilling",
+  "tableOutOfService",
+  "reservationCreated",
+  "reservationUpdated",
+  "reservationCancelled",
+  "reservationCheckedIn",
+  "sessionStarted",
+  "sessionEnded",
+  "new-order",
+  "order-status-updated",
+];
 
 export default function AdminTablesPage() {
-  const [tables, setTables] = useState<AdminTable[]>([]);
+  const [tab, setTab] = useState<Tab>("grid");
+
+  const [tables, setTables] = useState<TableGridItem[]>([]);
+  const [analytics, setAnalytics] = useState<TableAnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [label, setLabel] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [origin, setOrigin] = useState("");
 
-  useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<TableStatus | "all">("all");
 
-  const load = useCallback(() => {
-    setLoading(true);
-    fetchAdminTables(RESTAURANT_ID)
-      .then(setTables)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+  const [reservingTable, setReservingTable] = useState<TableGridItem | null>(null);
+
+  const load = useCallback(async () => {
+    const [grid, stats] = await Promise.all([
+      fetchTableGrid(RESTAURANT_ID),
+      fetchTableAnalytics(RESTAURANT_ID).catch(() => null),
+    ]);
+    setTables(grid);
+    if (stats) setAnalytics(stats);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const handleCreate = async () => {
-    if (!label.trim()) {
-      setError("Table label is required");
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    try {
-      await createAdminTable(RESTAURANT_ID, label.trim());
-      setShowForm(false);
-      setLabel("");
-      load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setSaving(false);
-    }
-  };
+  // Live updates: join the tables room and refetch on any relevant event.
+  // Refetching the whole grid (rather than patching individual tables) is
+  // deliberately simple/robust — table counts here are small enough that a
+  // full refetch per event is cheap and can't drift out of sync.
+  useEffect(() => {
+    const socket = getSocket();
+    socket.emit("join-tables", RESTAURANT_ID);
 
-  const handleToggleActive = async (table: AdminTable) => {
-    await updateAdminTable(table._id, { isActive: !table.isActive });
-    load();
-  };
+    const handler = () => load();
+    LIVE_EVENTS.forEach((evt) => socket.on(evt, handler));
 
-  const handleDelete = async (table: AdminTable) => {
-    if (!confirm(`Delete "${table.label}"? Its QR code will stop working immediately.`)) return;
-    await deleteAdminTable(table._id);
-    load();
-  };
+    return () => {
+      LIVE_EVENTS.forEach((evt) => socket.off(evt, handler));
+      socket.emit("leave-tables", RESTAURANT_ID);
+    };
+  }, [load]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return tables.filter((t) => {
+      if (statusFilter !== "all" && t.status !== statusFilter) return false;
+      if (!q) return true;
+      const customer = t.activeSession?.customerName || t.activeReservation?.customerName || "";
+      const phone = t.activeSession?.phoneNumber || t.activeReservation?.phoneNumber || "";
+      return (
+        t.label.toLowerCase().includes(q) ||
+        customer.toLowerCase().includes(q) ||
+        phone.toLowerCase().includes(q)
+      );
+    });
+  }, [tables, search, statusFilter]);
+
+  const tableLabelById = useMemo(() => new Map(tables.map((t) => [t._id, t.label])), [tables]);
 
   return (
     <div>
-      <PageHeader
-        title="Tables & QR Codes"
-        description="Each table gets its own permanent QR code — print and place one per table"
-        action={
-          <PrimaryButton onClick={() => setShowForm(true)}>
-            <Plus size={15} /> Add Table
-          </PrimaryButton>
-        }
-      />
+      <PageHeader title="Tables" description="Live table status, dining sessions, and reservations" />
 
-      {loading && <p style={{ fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)", fontSize: 13, color: adminColors.textSecondary }}>Loading…</p>}
-
-      {!loading && tables.length === 0 && (
-        <Card>
-          <p style={{ fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)", fontSize: 13, color: adminColors.textSecondary, margin: 0 }}>
-            No tables yet. Add your first one.
-          </p>
-        </Card>
-      )}
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-          gap: 16,
-        }}
-      >
-        {tables.map((table) => {
-          const url = origin ? `${origin}/${RESTAURANT_ID}?table=${table.token}` : "";
-          return (
-            <Card key={table._id} style={{ opacity: table.isActive ? 1 : 0.5 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                <span
-                  style={{
-                    fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
-                    fontSize: 14,
-                    fontWeight: 700,
-                    color: adminColors.text,
-                  }}
-                >
-                  {table.label}
-                </span>
-                {!table.isActive && <Badge color={adminColors.textSecondary}>Inactive</Badge>}
-              </div>
-
-              {url && (
-                <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={qrImageUrl(url)} alt={`QR code for ${table.label}`} width={160} height={160} />
-                </div>
-              )}
-
-              <div
-                style={{
-                  fontFamily: "monospace",
-                  fontSize: 10,
-                  color: adminColors.textSecondary,
-                  wordBreak: "break-all",
-                  textAlign: "center",
-                  marginBottom: 12,
-                }}
-              >
-                {table.token}
-              </div>
-
-              <div style={{ display: "flex", gap: 6 }}>
-                <a
-                  href={qrImageUrl(url)}
-                  download={`${table.label.replace(/\s+/g, "-")}-qr.png`}
-                  style={{ flex: 1 }}
-                >
-                  <SecondaryButton>
-                    <Download size={13} /> Download
-                  </SecondaryButton>
-                </a>
-                <SecondaryButton onClick={() => handleToggleActive(table)}>
-                  <Power size={13} />
-                </SecondaryButton>
-                <SecondaryButton danger onClick={() => handleDelete(table)}>
-                  <Trash2 size={13} />
-                </SecondaryButton>
-              </div>
-            </Card>
-          );
-        })}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        {(
+          [
+            { key: "grid", label: "Table Grid" },
+            { key: "reservations", label: "Reservations" },
+            { key: "qr", label: "QR Codes" },
+          ] as { key: Tab; label: string }[]
+        ).map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 10,
+              border: `1px solid ${tab === t.key ? adminColors.primary : adminColors.border}`,
+              background: tab === t.key ? adminColors.primary : "#FFFFFF",
+              color: tab === t.key ? "#FFFFFF" : adminColors.text,
+              fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      {showForm && (
-        <Modal title="Add Table" onClose={() => setShowForm(false)}>
-          <TextInput label="Table Label" value={label} onChange={setLabel} placeholder="e.g. Table 11" />
-          {error && <div style={{ fontSize: 12, fontWeight: 600, color: adminColors.danger }}>{error}</div>}
-          <div style={{ display: "flex", gap: 8 }}>
-            <PrimaryButton onClick={handleCreate} disabled={saving}>
-              {saving ? "Adding…" : "Add Table"}
-            </PrimaryButton>
-            <SecondaryButton onClick={() => setShowForm(false)}>Cancel</SecondaryButton>
+      {tab === "grid" && (
+        <>
+          {analytics && <TableAnalyticsPanel analytics={analytics} />}
+
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 18, alignItems: "center" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "8px 12px",
+                borderRadius: 10,
+                border: `1px solid ${adminColors.border}`,
+                background: "#FFFFFF",
+                flex: "1 1 240px",
+              }}
+            >
+              <Search size={14} color={adminColors.textSecondary} />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search table, customer, or phone"
+                style={{
+                  border: "none",
+                  outline: "none",
+                  flex: 1,
+                  fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
+                  fontSize: 13,
+                  color: adminColors.text,
+                }}
+              />
+            </div>
+
+            <FilterChip label="All" active={statusFilter === "all"} onClick={() => setStatusFilter("all")} />
+            {STATUS_FILTERS.map((s) => (
+              <FilterChip
+                key={s}
+                label={STATUS_META[s].label}
+                color={STATUS_META[s].color}
+                active={statusFilter === s}
+                onClick={() => setStatusFilter(s)}
+              />
+            ))}
           </div>
-        </Modal>
+
+          {loading && (
+            <p style={{ fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)", fontSize: 13, color: adminColors.textSecondary }}>
+              Loading…
+            </p>
+          )}
+
+          {!loading && filtered.length === 0 && (
+            <p style={{ fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)", fontSize: 13, color: adminColors.textSecondary }}>
+              No tables match your search/filter.
+            </p>
+          )}
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+              gap: 16,
+            }}
+          >
+            {filtered.map((table) => (
+              <TableCard key={table._id} table={table} onClick={() => setSelectedTableId(table._id)} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {tab === "reservations" && (
+        <ReservationCalendar restaurantId={RESTAURANT_ID} tableLabelById={tableLabelById} onChanged={load} />
+      )}
+
+      {tab === "qr" && <QrCodesTab RESTAURANT_ID={RESTAURANT_ID} />}
+
+      {selectedTableId && (
+        <TableDetailsDrawer
+          tableId={selectedTableId}
+          onClose={() => setSelectedTableId(null)}
+          onChanged={load}
+          onReserve={(table) => {
+            setSelectedTableId(null);
+            setReservingTable(table);
+          }}
+        />
+      )}
+
+      {reservingTable && (
+        <ReservationForm
+          restaurantId={RESTAURANT_ID}
+          table={reservingTable}
+          onClose={() => setReservingTable(null)}
+          onCreated={() => {
+            setReservingTable(null);
+            load();
+          }}
+        />
       )}
     </div>
+  );
+}
+
+function FilterChip({
+  label,
+  active,
+  onClick,
+  color,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  color?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: "6px 12px",
+        borderRadius: 999,
+        border: `1px solid ${active ? color || adminColors.primary : adminColors.border}`,
+        background: active ? `${color || adminColors.primary}1A` : "#FFFFFF",
+        color: active ? color || adminColors.primary : adminColors.textSecondary,
+        fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
+        fontSize: 12,
+        fontWeight: 700,
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {label}
+    </button>
   );
 }

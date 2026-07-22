@@ -104,6 +104,206 @@ export async function deleteAdminTable(tableId: string): Promise<void> {
   await handle(res);
 }
 
+// ---------- Table Management ----------
+
+export type TableStatus =
+  | "available"
+  | "reserved"
+  | "occupied"
+  | "billing"
+  | "cleaning"
+  | "out_of_service";
+
+export interface TableSessionData {
+  sessionId: string;
+  restaurantId: string;
+  tableId: string;
+  tableToken: string;
+  customerName: string;
+  phoneNumber: string;
+  reservationId: string | null;
+  orderIds: string[];
+  sessionStart: string;
+  sessionEnd: string | null;
+  currentBill: number;
+  status: "active" | "closed";
+}
+
+export type ReservationStatus =
+  | "pending"
+  | "confirmed"
+  | "checked_in"
+  | "completed"
+  | "cancelled"
+  | "no_show";
+
+export interface ReservationData {
+  reservationId: string;
+  restaurantId: string;
+  tableId: string;
+  customerName: string;
+  phoneNumber: string;
+  guestCount: number;
+  reservationDate: string;
+  reservationTime: string;
+  expectedDuration: number;
+  specialNotes: string;
+  status: ReservationStatus;
+  checkedInAt: string | null;
+  completedAt: string | null;
+}
+
+export interface TableGridItem extends AdminTable {
+  capacity: number;
+  status: TableStatus;
+  currentSessionId: string | null;
+  currentReservationId: string | null;
+  occupiedAt: string | null;
+  activeSession: TableSessionData | null;
+  activeReservation: ReservationData | null;
+}
+
+export interface TableAnalyticsData {
+  counts: Record<TableStatus, number>;
+  averageDiningDurationMinutes: number;
+  averageTurnoverPerTable: number;
+  mostUsedTables: { tableId: string; label: string; sessionCount: number }[];
+  mostReservedTables: { tableId: string; label: string; reservationCount: number }[];
+}
+
+export async function fetchTableGrid(restaurantId: string): Promise<TableGridItem[]> {
+  const res = await fetch(`${API_BASE_URL}/api/admin/tables/${restaurantId}/grid`, { cache: "no-store" });
+  const data = await handle<{ tables: TableGridItem[] }>(res);
+  return data.tables;
+}
+
+export async function fetchTableDetails(
+  tableId: string
+): Promise<{ table: TableGridItem; activeSession: TableSessionData | null; activeReservation: ReservationData | null }> {
+  const res = await fetch(`${API_BASE_URL}/api/admin/tables/${tableId}/details`, { cache: "no-store" });
+  return handle(res);
+}
+
+export async function fetchTableAnalytics(restaurantId: string): Promise<TableAnalyticsData> {
+  const res = await fetch(`${API_BASE_URL}/api/admin/tables/${restaurantId}/analytics`, { cache: "no-store" });
+  return handle<TableAnalyticsData>(res);
+}
+
+// Manual-only: admin taps this when the customer asks for the bill.
+export async function markTableBilling(tableId: string): Promise<AdminTable> {
+  const res = await fetch(`${API_BASE_URL}/api/admin/tables/${tableId}/billing`, { method: "PATCH" });
+  const data = await handle<{ table: AdminTable }>(res);
+  return data.table;
+}
+
+// "Close Session": customer has paid and left -> ends session, table -> Cleaning.
+export async function closeTableSession(tableId: string): Promise<AdminTable> {
+  const res = await fetch(`${API_BASE_URL}/api/admin/tables/${tableId}/close-session`, { method: "PATCH" });
+  const data = await handle<{ table: AdminTable }>(res);
+  return data.table;
+}
+
+export async function markTableAvailable(tableId: string): Promise<AdminTable> {
+  const res = await fetch(`${API_BASE_URL}/api/admin/tables/${tableId}/available`, { method: "PATCH" });
+  const data = await handle<{ table: AdminTable }>(res);
+  return data.table;
+}
+
+export async function markTableOutOfService(tableId: string): Promise<AdminTable> {
+  const res = await fetch(`${API_BASE_URL}/api/admin/tables/${tableId}/out-of-service`, { method: "PATCH" });
+  const data = await handle<{ table: AdminTable }>(res);
+  return data.table;
+}
+
+export async function fetchSessionOrders(
+  sessionId: string
+): Promise<{ session: TableSessionData; orders: RecentOrder[] }> {
+  const res = await fetch(`${API_BASE_URL}/api/admin/table-sessions/${sessionId}/orders`, { cache: "no-store" });
+  return handle(res);
+}
+
+// ---------- Reservations ----------
+
+export async function fetchReservations(
+  restaurantId: string,
+  params?: { date?: string; from?: string; to?: string }
+): Promise<ReservationData[]> {
+  const query = new URLSearchParams();
+  if (params?.date) query.set("date", params.date);
+  if (params?.from) query.set("from", params.from);
+  if (params?.to) query.set("to", params.to);
+  const qs = query.toString();
+  const res = await fetch(`${API_BASE_URL}/api/admin/reservations/${restaurantId}${qs ? `?${qs}` : ""}`, {
+    cache: "no-store",
+  });
+  const data = await handle<{ reservations: ReservationData[] }>(res);
+  return data.reservations;
+}
+
+export async function createReservation(payload: {
+  restaurantId: string;
+  tableId: string;
+  customerName: string;
+  phoneNumber: string;
+  guestCount: number;
+  reservationDate: string;
+  reservationTime: string;
+  expectedDuration?: number;
+  specialNotes?: string;
+}): Promise<{ reservation: ReservationData; table: AdminTable }> {
+  const res = await fetch(`${API_BASE_URL}/api/admin/reservations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return handle(res);
+}
+
+export async function updateReservation(
+  reservationId: string,
+  updates: Partial<{
+    customerName: string;
+    phoneNumber: string;
+    guestCount: number;
+    reservationDate: string;
+    reservationTime: string;
+    expectedDuration: number;
+    specialNotes: string;
+    tableId: string;
+  }>
+): Promise<ReservationData> {
+  const res = await fetch(`${API_BASE_URL}/api/admin/reservations/${reservationId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(updates),
+  });
+  const data = await handle<{ reservation: ReservationData }>(res);
+  return data.reservation;
+}
+
+export async function cancelReservation(reservationId: string): Promise<ReservationData> {
+  const res = await fetch(`${API_BASE_URL}/api/admin/reservations/${reservationId}`, { method: "DELETE" });
+  const data = await handle<{ reservation: ReservationData }>(res);
+  return data.reservation;
+}
+
+export async function checkInReservation(
+  reservationId: string
+): Promise<{ reservation: ReservationData; session: TableSessionData; table: AdminTable }> {
+  const res = await fetch(`${API_BASE_URL}/api/admin/reservations/${reservationId}/check-in`, {
+    method: "POST",
+  });
+  return handle(res);
+}
+
+export async function markReservationNoShow(reservationId: string): Promise<ReservationData> {
+  const res = await fetch(`${API_BASE_URL}/api/admin/reservations/${reservationId}/no-show`, {
+    method: "POST",
+  });
+  const data = await handle<{ reservation: ReservationData }>(res);
+  return data.reservation;
+}
+
 // ---------- Staff ----------
 
 export interface AdminStaff {

@@ -2,12 +2,65 @@ const Order = require("../models/Order");
 const MenuItem = require("../models/MenuItem");
 const Table = require("../models/Table");
 const Session = require("../models/Session");
+const TableSession = require("../models/TableSession");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
 const generateOrderId = require("../utils/generateOrderId");
-const { emitNewOrder, emitOrderStatusUpdate } = require("../sockets/socket");
+const generateTableSessionId = require("../utils/generateTableSessionId");
+const {
+  emitNewOrder,
+  emitOrderStatusUpdate,
+  emitTableOccupied,
+  emitSessionStarted,
+} = require("../sockets/socket");
 
 const TAX_RATE = 0.05;
+
+// Table Management side effect, run after an order is successfully created:
+//   - if the table has no active TableSession, create one and mark the
+//     table Occupied (this is the FIRST order for this dining visit)
+//   - if it already has one (from a previous order this visit, or from an
+//     admin Check-In), just attach this order and refresh the bill total
+// This never throws into the order-creation response — a failure here
+// should never block or roll back a successful order, since the customer
+// flow must keep working even if the table-management side is degraded.
+async function syncTableOccupancyForOrder(table, order) {
+  try {
+    let session = table.currentSessionId
+      ? await TableSession.findOne({ sessionId: table.currentSessionId, status: "active" })
+      : await TableSession.findOne({ tableId: table._id, status: "active" });
+
+    if (!session) {
+      session = await TableSession.create({
+        sessionId: generateTableSessionId(),
+        restaurantId: order.restaurantId,
+        tableId: table._id,
+        tableToken: table.token,
+        orderIds: [order.orderId],
+        sessionStart: order.placedAt,
+        currentBill: order.totalAmount,
+        status: "active",
+      });
+
+      table.status = "occupied";
+      table.currentSessionId = session.sessionId;
+      table.occupiedAt = session.sessionStart;
+      await table.save();
+
+      emitSessionStarted(session);
+      emitTableOccupied(table);
+    } else {
+      session.orderIds.push(order.orderId);
+      session.currentBill += order.totalAmount;
+      await session.save();
+      // Table status doesn't change on repeat orders — it's already
+      // "occupied" (or, in a reservation-check-in edge case, could already
+      // be "occupied" too), so no further table update/emit is needed.
+    }
+  } catch (err) {
+    console.error("Table occupancy sync failed (order was still created):", err);
+  }
+}
 
 // POST /api/orders
 // Body: { sessionId, restaurantId, tableToken, items: [{ id, quantity }],
@@ -124,6 +177,12 @@ const createOrder = asyncHandler(async (req, res) => {
   });
 
   emitNewOrder(order);
+
+  // Table Management: attach this order to the table's active dining
+  // session (creating one + occupying the table if this is the first
+  // order of the visit). Does not affect the response shape or the
+  // customer-facing flow in any way.
+  await syncTableOccupancyForOrder(table, order);
 
   res.status(201).json({ order });
 });

@@ -86,6 +86,19 @@ function initSocket(httpServer, clientOrigin) {
       socket.join(`kitchen:${restaurantId}`);
     });
 
+    // ---- Table Management dashboard --------------------------------------
+    // Joined by the admin "Tables" page to receive live status/reservation/
+    // session updates without polling.
+    socket.on("join-tables", (restaurantId) => {
+      if (!restaurantId) return;
+      socket.join(`tables:${restaurantId}`);
+    });
+
+    socket.on("leave-tables", (restaurantId) => {
+      if (!restaurantId) return;
+      socket.leave(`tables:${restaurantId}`);
+    });
+
     socket.on("join-order", (orderId) => {
       if (!orderId) return;
       socket.join(`order:${orderId}`);
@@ -240,4 +253,46 @@ function emitOrderStatusUpdate(order) {
   getIO().to(`session:${order.sessionId}`).emit("order-status-updated", order);
 }
 
-module.exports = { initSocket, getIO, emitNewOrder, emitOrderStatusUpdate };
+// ---------------------------------------------------------------------------
+// Table Management emits — all scoped to the `tables:<restaurantId>` room
+// joined by the admin Tables page. `table` / `reservation` / `session` are
+// the plain serialized Mongo documents (already .toJSON()-friendly).
+// ---------------------------------------------------------------------------
+function emitTableEvent(restaurantId, event, payload) {
+  getIO().to(`tables:${restaurantId}`).emit(event, payload);
+}
+
+const emitTableOccupied = (table) => emitTableEvent(table.restaurantId, "tableOccupied", table);
+const emitTableReserved = (table) => emitTableEvent(table.restaurantId, "tableReserved", table);
+const emitTableAvailable = (table) => emitTableEvent(table.restaurantId, "tableAvailable", table);
+const emitTableCleaning = (table) => emitTableEvent(table.restaurantId, "tableCleaning", table);
+const emitTableBilling = (table) => emitTableEvent(table.restaurantId, "tableBilling", table);
+const emitTableOutOfService = (table) =>
+  emitTableEvent(table.restaurantId, "tableOutOfService", table);
+
+const emitReservationCreated = (r) => emitTableEvent(r.restaurantId, "reservationCreated", r);
+const emitReservationUpdated = (r) => emitTableEvent(r.restaurantId, "reservationUpdated", r);
+const emitReservationCancelled = (r) => emitTableEvent(r.restaurantId, "reservationCancelled", r);
+const emitReservationCheckedIn = (r) => emitTableEvent(r.restaurantId, "reservationCheckedIn", r);
+
+const emitSessionStarted = (s) => emitTableEvent(s.restaurantId, "sessionStarted", s);
+const emitSessionEnded = (s) => emitTableEvent(s.restaurantId, "sessionEnded", s);
+
+module.exports = {
+  initSocket,
+  getIO,
+  emitNewOrder,
+  emitOrderStatusUpdate,
+  emitTableOccupied,
+  emitTableReserved,
+  emitTableAvailable,
+  emitTableCleaning,
+  emitTableBilling,
+  emitTableOutOfService,
+  emitReservationCreated,
+  emitReservationUpdated,
+  emitReservationCancelled,
+  emitReservationCheckedIn,
+  emitSessionStarted,
+  emitSessionEnded,
+};
