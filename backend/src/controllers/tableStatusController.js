@@ -3,6 +3,7 @@ const TableSession = require("../models/TableSession");
 const Reservation = require("../models/Reservation");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
+const { sortTablesByLabel } = require("../utils/sortTablesByLabel");
 const {
   emitTableBilling,
   emitTableCleaning,
@@ -34,8 +35,8 @@ function normalizeTable(table) {
 // session (if occupied/billing) and active reservation (if reserved).
 const getTableGrid = asyncHandler(async (req, res) => {
   const { restaurantId } = req.params;
-  const rawTables = await Table.find({ restaurantId }).sort({ label: 1 }).lean();
-  const tables = rawTables.map(normalizeTable);
+  const rawTables = await Table.find({ restaurantId }).lean();
+  const tables = sortTablesByLabel(rawTables.map(normalizeTable));
 
   const sessionIds = tables.map((t) => t.currentSessionId).filter(Boolean);
   const reservationIds = tables.map((t) => t.currentReservationId).filter(Boolean);

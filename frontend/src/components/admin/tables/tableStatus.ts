@@ -1,12 +1,30 @@
 import type { TableStatus } from "@/lib/admin-api";
 
-export const STATUS_META: Record<TableStatus, { label: string; color: string; dot: string }> = {
-  available: { label: "Available", color: "#2E7D4F", dot: "🟢" },
-  reserved: { label: "Reserved", color: "#C9971F", dot: "🟡" },
-  occupied: { label: "Occupied", color: "#C24C2E", dot: "🔴" },
-  billing: { label: "Billing", color: "#7C3AED", dot: "🟣" },
-  cleaning: { label: "Cleaning", color: "#3F3F3F", dot: "⚫" },
-  out_of_service: { label: "Out of Service", color: "#9CA3AF", dot: "⚪" },
+// Flat, professional palette for the Table Management module's status
+// badges, per spec: Available green, Reserved yellow, Occupied red,
+// Billing purple, Cleaning orange, Out of Service gray. Kept local to this
+// module (not merged into the shared adminColors) so it can't affect any
+// other admin page's styling.
+export const STATUS_META: Record<TableStatus, { label: string; color: string }> = {
+  available: { label: "Available", color: "#2E7D4F" },
+  reserved: { label: "Reserved", color: "#CA8A04" },
+  occupied: { label: "Occupied", color: "#DC2626" },
+  billing: { label: "Billing", color: "#7C3AED" },
+  cleaning: { label: "Cleaning", color: "#EA580C" },
+  out_of_service: { label: "Out of Service", color: "#6B7280" },
+};
+
+// Flat (no-gradient) button colors for the Table Management module, using
+// the same dark-green brand primary as the rest of the dashboard. Scoped
+// here rather than changing the shared PrimaryButton/SecondaryButton
+// (which have a decorative gradient used dashboard-wide, including Menu
+// Management) so other modules keep their exact current appearance.
+export const TABLE_BUTTON_COLORS = {
+  primary: "#3A4C3B",
+  primaryText: "#FFFFFF",
+  secondaryBorder: "#EAEAE5",
+  secondaryText: "#1C1C1C",
+  danger: "#DC2626",
 };
 
 // Defensive lookup: falls back to the "available" appearance instead of

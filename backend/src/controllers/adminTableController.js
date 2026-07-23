@@ -1,13 +1,16 @@
 const crypto = require("crypto");
 const Table = require("../models/Table");
+const TableSession = require("../models/TableSession");
+const Reservation = require("../models/Reservation");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
+const { sortTablesByLabel } = require("../utils/sortTablesByLabel");
 
 // GET /api/admin/tables/:restaurantId
 const listTables = asyncHandler(async (req, res) => {
   const { restaurantId } = req.params;
-  const tables = await Table.find({ restaurantId }).sort({ label: 1 });
-  res.json({ tables });
+  const tables = await Table.find({ restaurantId });
+  res.json({ tables: sortTablesByLabel(tables) });
 });
 
 // Generates a short, random, non-sequential token — same shape as the
@@ -52,8 +55,22 @@ const updateTable = asyncHandler(async (req, res) => {
 
 // DELETE /api/admin/tables/:tableId
 const deleteTable = asyncHandler(async (req, res) => {
-  const table = await Table.findByIdAndDelete(req.params.tableId);
+  const table = await Table.findById(req.params.tableId);
   if (!table) throw new ApiError(404, "Table not found");
+
+  const [activeSession, activeReservation] = await Promise.all([
+    TableSession.findOne({ tableId: table._id, status: "active" }),
+    Reservation.findOne({ tableId: table._id, status: { $in: ["pending", "confirmed", "checked_in"] } }),
+  ]);
+
+  if (activeSession) {
+    throw new ApiError(400, "Cannot delete a table with an active dining session. Close the session first.");
+  }
+  if (activeReservation) {
+    throw new ApiError(400, "Cannot delete a table with an active reservation. Cancel the reservation first.");
+  }
+
+  await Table.findByIdAndDelete(req.params.tableId);
   res.json({ deleted: true });
 });
 

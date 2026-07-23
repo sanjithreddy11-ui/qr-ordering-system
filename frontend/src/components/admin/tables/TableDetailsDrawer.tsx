@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Modal, PrimaryButton, SecondaryButton, adminColors } from "@/components/admin/ui";
+import { Modal, SecondaryButton, Badge, adminColors } from "@/components/admin/ui";
 import {
   fetchTableDetails,
   markTableBilling,
@@ -16,17 +16,17 @@ import {
   type RecentOrder,
 } from "@/lib/admin-api";
 import { statusMeta, formatCurrency, formatDuration, formatTime } from "./tableStatus";
+import { TablePrimaryButton } from "./tableButtons";
+import ModalHeader from "./ModalHeader";
 
 export default function TableDetailsDrawer({
   tableId,
   onClose,
   onChanged,
-  onReserve,
 }: {
   tableId: string;
   onClose: () => void;
   onChanged: () => void;
-  onReserve: (table: TableGridItem) => void;
 }) {
   const [table, setTable] = useState<TableGridItem | null>(null);
   const [orders, setOrders] = useState<RecentOrder[]>([]);
@@ -86,24 +86,19 @@ export default function TableDetailsDrawer({
   const reservation = table.activeReservation;
 
   return (
-    <Modal title={table.label} onClose={onClose}>
-      <span
-        style={{
-          alignSelf: "flex-start",
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 5,
-          padding: "3px 10px",
-          borderRadius: 999,
-          fontSize: 11,
-          fontWeight: 700,
-          fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
-          background: `${meta.color}1A`,
-          color: meta.color,
-        }}
-      >
-        {meta.dot} {meta.label}
-      </span>
+    <Modal title={table.label} titleNode={<ModalHeader title={table.label} onClose={onClose} />} onClose={onClose}>
+      <Badge color={meta.color}>
+        <span
+          style={{
+            display: "inline-block",
+            width: 6,
+            height: 6,
+            borderRadius: "50%",
+            background: meta.color,
+          }}
+        />
+        {meta.label}
+      </Badge>
 
       {/* Occupied / Billing: session details */}
       {session && (
@@ -155,7 +150,7 @@ export default function TableDetailsDrawer({
 
       {table.status === "available" && (
         <p style={{ fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)", fontSize: 13, color: adminColors.textSecondary, margin: 0 }}>
-          This table is free. Customers can order by scanning its QR code, or you can reserve it for a phone/walk-in booking.
+          This table is free. Customers can order by scanning its QR code, or use the &quot;+ Reserve Table&quot; button above to book it for a phone/walk-in reservation.
         </p>
       )}
 
@@ -168,21 +163,16 @@ export default function TableDetailsDrawer({
       {/* Actions, per current status */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
         {table.status === "available" && (
-          <>
-            <PrimaryButton onClick={() => onReserve(table)} disabled={busy}>
-              Reserve Table
-            </PrimaryButton>
-            <SecondaryButton onClick={() => run(() => markTableOutOfService(table._id))}>
-              Mark Out of Service
-            </SecondaryButton>
-          </>
+          <SecondaryButton onClick={() => run(() => markTableOutOfService(table._id))}>
+            Mark Out of Service
+          </SecondaryButton>
         )}
 
         {table.status === "reserved" && reservation && (
           <>
-            <PrimaryButton onClick={() => run(() => checkInReservation(reservation.reservationId))} disabled={busy}>
+            <TablePrimaryButton onClick={() => run(() => checkInReservation(reservation.reservationId))} disabled={busy}>
               Check In
-            </PrimaryButton>
+            </TablePrimaryButton>
             <SecondaryButton onClick={() => run(() => markReservationNoShow(reservation.reservationId))}>
               No Show
             </SecondaryButton>
@@ -193,27 +183,27 @@ export default function TableDetailsDrawer({
         )}
 
         {table.status === "occupied" && (
-          <PrimaryButton onClick={() => run(() => markTableBilling(table._id))} disabled={busy}>
+          <TablePrimaryButton onClick={() => run(() => markTableBilling(table._id))} disabled={busy}>
             Move to Billing
-          </PrimaryButton>
+          </TablePrimaryButton>
         )}
 
         {table.status === "billing" && (
-          <PrimaryButton onClick={() => run(() => closeTableSession(table._id))} disabled={busy}>
+          <TablePrimaryButton onClick={() => run(() => closeTableSession(table._id))} disabled={busy}>
             Close Session
-          </PrimaryButton>
+          </TablePrimaryButton>
         )}
 
         {table.status === "cleaning" && (
-          <PrimaryButton onClick={() => run(() => markTableAvailable(table._id))} disabled={busy}>
+          <TablePrimaryButton onClick={() => run(() => markTableAvailable(table._id))} disabled={busy}>
             Mark Available
-          </PrimaryButton>
+          </TablePrimaryButton>
         )}
 
         {table.status === "out_of_service" && (
-          <PrimaryButton onClick={() => run(() => markTableAvailable(table._id))} disabled={busy}>
+          <TablePrimaryButton onClick={() => run(() => markTableAvailable(table._id))} disabled={busy}>
             Mark Available
-          </PrimaryButton>
+          </TablePrimaryButton>
         )}
 
         {table.status !== "out_of_service" && table.status !== "available" && table.status !== "reserved" && (

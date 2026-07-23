@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { Search } from "lucide-react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { Search, Plus } from "lucide-react";
 import { PageHeader, adminColors } from "@/components/admin/ui";
 import { getSocket } from "@/lib/socket";
 import {
@@ -18,6 +18,7 @@ import TableAnalyticsPanel from "@/components/admin/tables/TableAnalyticsPanel";
 import ReservationCalendar from "@/components/admin/tables/ReservationCalendar";
 import QrCodesTab from "@/components/admin/tables/QrCodesTab";
 import { STATUS_FILTERS, STATUS_META } from "@/components/admin/tables/tableStatus";
+import { TablePrimaryButton } from "@/components/admin/tables/tableButtons";
 
 const RESTAURANT_ID = "lifafa"; // TODO: make dynamic if you support multiple restaurants
 
@@ -54,9 +55,14 @@ export default function AdminTablesPage() {
   const [statusFilter, setStatusFilter] = useState<TableStatus | "all">("all");
 
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
-  const [reservingTable, setReservingTable] = useState<TableGridItem | null>(null);
+  const [showReservationForm, setShowReservationForm] = useState(false);
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const anyModalOpen = Boolean(selectedTableId) || showReservationForm;
 
   const load = useCallback(async () => {
+    // Grid comes back numerically sorted by table number from the backend
+    // (Table 1, 2, 3 ... 10 — not "1, 10, 2" string order).
     const [grid, stats] = await Promise.all([
       fetchTableGrid(RESTAURANT_ID),
       fetchTableAnalytics(RESTAURANT_ID).catch(() => null),
@@ -87,6 +93,18 @@ export default function AdminTablesPage() {
     };
   }, [load]);
 
+  // Defensive fix for the reported "typing in the reservation form also
+  // fills the search bar" bug: even though the search input and the
+  // reservation form fields are already fully separate React state, a
+  // modal that never moves keyboard focus into itself can leave the
+  // browser's focus sitting on the search input underneath, so keystrokes
+  // land there instead. Explicitly blurring (and disabling) the search
+  // input for the duration that any table modal is open makes this
+  // impossible regardless of focus timing.
+  useEffect(() => {
+    if (anyModalOpen) searchInputRef.current?.blur();
+  }, [anyModalOpen]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return tables.filter((t) => {
@@ -103,10 +121,19 @@ export default function AdminTablesPage() {
   }, [tables, search, statusFilter]);
 
   const tableLabelById = useMemo(() => new Map(tables.map((t) => [t._id, t.label])), [tables]);
+  const availableTables = useMemo(() => tables.filter((t) => t.status === "available"), [tables]);
 
   return (
     <div>
-      <PageHeader title="Tables" description="Live table status, dining sessions, and reservations" />
+      <PageHeader
+        title="Tables"
+        description="Live table status, dining sessions, and reservations"
+        action={
+          <TablePrimaryButton onClick={() => setShowReservationForm(true)}>
+            <Plus size={15} /> Reserve Table
+          </TablePrimaryButton>
+        }
+      />
 
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
         {(
@@ -149,19 +176,22 @@ export default function AdminTablesPage() {
                 padding: "8px 12px",
                 borderRadius: 10,
                 border: `1px solid ${adminColors.border}`,
-                background: "#FFFFFF",
+                background: anyModalOpen ? adminColors.bg : "#FFFFFF",
                 flex: "1 1 240px",
               }}
             >
               <Search size={14} color={adminColors.textSecondary} />
               <input
+                ref={searchInputRef}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                disabled={anyModalOpen}
                 placeholder="Search table, customer, or phone"
                 style={{
                   border: "none",
                   outline: "none",
                   flex: 1,
+                  background: "transparent",
                   fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
                   fontSize: 13,
                   color: adminColors.text,
@@ -196,12 +226,17 @@ export default function AdminTablesPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))",
               gap: 16,
             }}
           >
             {filtered.map((table) => (
-              <TableCard key={table._id} table={table} onClick={() => setSelectedTableId(table._id)} />
+              <TableCard
+                key={table._id}
+                table={table}
+                onClick={() => setSelectedTableId(table._id)}
+                onDeleted={load}
+              />
             ))}
           </div>
         </>
@@ -214,24 +249,16 @@ export default function AdminTablesPage() {
       {tab === "qr" && <QrCodesTab RESTAURANT_ID={RESTAURANT_ID} />}
 
       {selectedTableId && (
-        <TableDetailsDrawer
-          tableId={selectedTableId}
-          onClose={() => setSelectedTableId(null)}
-          onChanged={load}
-          onReserve={(table) => {
-            setSelectedTableId(null);
-            setReservingTable(table);
-          }}
-        />
+        <TableDetailsDrawer tableId={selectedTableId} onClose={() => setSelectedTableId(null)} onChanged={load} />
       )}
 
-      {reservingTable && (
+      {showReservationForm && (
         <ReservationForm
           restaurantId={RESTAURANT_ID}
-          table={reservingTable}
-          onClose={() => setReservingTable(null)}
+          availableTables={availableTables}
+          onClose={() => setShowReservationForm(false)}
           onCreated={() => {
-            setReservingTable(null);
+            setShowReservationForm(false);
             load();
           }}
         />

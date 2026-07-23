@@ -1,33 +1,43 @@
 "use client";
 
 import React, { useState } from "react";
-import { Modal, TextInput, TextArea, PrimaryButton, SecondaryButton, adminColors } from "@/components/admin/ui";
+import { Modal, TextInput, TextArea, Select, SecondaryButton, adminColors } from "@/components/admin/ui";
 import { createReservation, type TableGridItem } from "@/lib/admin-api";
+import { TablePrimaryButton } from "./tableButtons";
+import { TABLE_BUTTON_COLORS } from "./tableStatus";
+import ModalHeader from "./ModalHeader";
 
 export default function ReservationForm({
   restaurantId,
-  table,
+  availableTables,
   onClose,
   onCreated,
 }: {
   restaurantId: string;
-  table: TableGridItem;
+  availableTables: TableGridItem[];
   onClose: () => void;
   onCreated: () => void;
 }) {
   const today = new Date().toISOString().slice(0, 10);
 
+  // Fully local state — deliberately isolated from any other component
+  // (e.g. the grid's search box) so typing here can never leak elsewhere.
+  const [tableId, setTableId] = useState(availableTables[0]?._id ?? "");
   const [customerName, setCustomerName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [reservationDate, setReservationDate] = useState(today);
   const [reservationTime, setReservationTime] = useState("19:00");
-  const [guestCount, setGuestCount] = useState(String(table.capacity || 2));
+  const [guestCount, setGuestCount] = useState("2");
   const [expectedDuration, setExpectedDuration] = useState("60");
   const [specialNotes, setSpecialNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async () => {
+    if (!tableId) {
+      setError("Choose a table to reserve");
+      return;
+    }
     if (!customerName.trim() || !phoneNumber.trim()) {
       setError("Customer name and phone number are required");
       return;
@@ -37,7 +47,7 @@ export default function ReservationForm({
     try {
       await createReservation({
         restaurantId,
-        tableId: table._id,
+        tableId,
         customerName: customerName.trim(),
         phoneNumber: phoneNumber.trim(),
         guestCount: Number(guestCount) || 1,
@@ -55,7 +65,25 @@ export default function ReservationForm({
   };
 
   return (
-    <Modal title={`Reserve ${table.label}`} onClose={onClose}>
+    <Modal
+      title="Reserve Table"
+      titleNode={<ModalHeader title="Reserve Table" onClose={onClose} />}
+      onClose={onClose}
+      closeOnOverlayClick={false}
+    >
+      {availableTables.length === 0 ? (
+        <p style={{ margin: 0, fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)", fontSize: 13, color: adminColors.textSecondary }}>
+          No tables are currently available to reserve.
+        </p>
+      ) : (
+        <Select
+          label="Table"
+          value={tableId}
+          onChange={setTableId}
+          options={availableTables.map((t) => ({ value: t._id, label: `${t.label} · Seats ${t.capacity}` }))}
+        />
+      )}
+
       <TextInput label="Customer Name" value={customerName} onChange={setCustomerName} placeholder="Full name" />
       <TextInput label="Phone Number" value={phoneNumber} onChange={setPhoneNumber} placeholder="+91 90000 00000" />
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -69,16 +97,16 @@ export default function ReservationForm({
       <TextArea label="Special Notes (Optional)" value={specialNotes} onChange={setSpecialNotes} />
 
       {error && (
-        <p style={{ color: adminColors.danger, fontSize: 12, fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)", margin: 0 }}>
+        <p style={{ color: TABLE_BUTTON_COLORS.danger, fontSize: 12, fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)", margin: 0 }}>
           {error}
         </p>
       )}
 
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
         <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-        <PrimaryButton onClick={handleSubmit} disabled={saving}>
+        <TablePrimaryButton onClick={handleSubmit} disabled={saving || availableTables.length === 0}>
           {saving ? "Saving…" : "Reserve Table"}
-        </PrimaryButton>
+        </TablePrimaryButton>
       </div>
     </Modal>
   );

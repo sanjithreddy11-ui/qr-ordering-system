@@ -27,7 +27,8 @@ export default function TableAnalyticsPanel({ analytics }: { analytics: TableAna
           <div key={s.label}>
             <div
               style={{
-                fontFamily: "var(--font-display, 'Cormorant Garamond', serif)",
+                fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
+                fontVariantNumeric: "tabular-nums",
                 fontSize: 26,
                 fontWeight: 700,
                 color: adminColors.text,

@@ -22,9 +22,22 @@ interface SessionStore extends Partial<SessionInfo> {
   clearSession: () => void;
 }
 
-function isLocallyValid(state: Partial<SessionInfo>, restaurantSlug: string) {
+function isLocallyValid(
+  state: Partial<SessionInfo>,
+  restaurantSlug: string,
+  tableTokenFromUrl?: string | null
+) {
   if (!state.sessionId || !state.expiresAt || !state.tableToken) return false;
   if (state.restaurantSlug !== restaurantSlug) return false;
+
+  // A different table token in the URL means a *different QR code* was
+  // scanned (e.g. same device, different table). That must never reuse
+  // a cached session from another table — even if that session hasn't
+  // expired yet. Only fall back to the cached session when the URL has
+  // no table param at all (e.g. an internal navigation/refresh where
+  // the store itself is the only source of truth).
+  if (tableTokenFromUrl && tableTokenFromUrl !== state.tableToken) return false;
+
   return new Date(state.expiresAt).getTime() > Date.now();
 }
 
@@ -40,7 +53,7 @@ export const useSessionStore = create<SessionStore>()(
       ensureSession: async (restaurantSlug, tableTokenFromUrl) => {
         const state = get();
 
-        if (isLocallyValid(state, restaurantSlug)) {
+        if (isLocallyValid(state, restaurantSlug, tableTokenFromUrl)) {
           // Double-check with the backend in case it was invalidated
           // server-side — but don't block the UI on this round trip.
           getSessionStatus(state.sessionId!).then((status) => {

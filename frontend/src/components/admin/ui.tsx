@@ -311,18 +311,37 @@ export function Badge({ children, color }: { children: React.ReactNode; color: s
 }
 
 // Simple modal overlay - used by every "add/edit X" form across admin pages.
+// New props are opt-in and default to the exact previous behavior, so every
+// existing caller (Menu, Staff, etc.) renders identically to before.
 export function Modal({
   title,
+  titleNode,
   onClose,
   children,
+  closeOnOverlayClick = true,
 }: {
   title: string;
+  // Escape hatch for callers that need a custom header (e.g. a clean-font
+  // title + close button) instead of the default decorative title text.
+  titleNode?: React.ReactNode;
   onClose: () => void;
   children: React.ReactNode;
+  closeOnOverlayClick?: boolean;
 }) {
+  // Escape-to-close: a safe, universal modal convention. Added for every
+  // caller since it can only ever add capability, never change how an
+  // existing modal currently behaves.
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   return (
     <div
-      onClick={onClose}
+      onClick={closeOnOverlayClick ? onClose : undefined}
       style={{
         position: "fixed",
         inset: 0,
@@ -347,17 +366,19 @@ export function Modal({
           boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
         }}
       >
-        <div
-          style={{
-            fontFamily: "var(--font-display, 'Cormorant Garamond', serif)",
-            fontSize: 20,
-            fontWeight: 700,
-            color: adminColors.text,
-            marginBottom: 18,
-          }}
-        >
-          {title}
-        </div>
+        {titleNode ?? (
+          <div
+            style={{
+              fontFamily: "var(--font-display, 'Cormorant Garamond', serif)",
+              fontSize: 20,
+              fontWeight: 700,
+              color: adminColors.text,
+              marginBottom: 18,
+            }}
+          >
+            {title}
+          </div>
+        )}
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>{children}</div>
       </div>
     </div>
