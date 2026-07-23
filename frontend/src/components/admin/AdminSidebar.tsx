@@ -2,26 +2,43 @@
 
 import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   UtensilsCrossed,
   QrCode,
   Receipt,
-  Settings,
+  BarChart3,
   Users,
+  Star,
+  Tag,
+  Settings,
+  UserCog,
+  LogOut,
 } from "lucide-react";
+import { useAuthStore } from "@/store/auth-store";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Menu", href: "/dashboard/menu", icon: UtensilsCrossed },
   { label: "Tables & QR", href: "/dashboard/tables", icon: QrCode },
-  { label: "Orders & Sales", href: "/dashboard/orders", icon: Receipt },
-  { label: "Staff", href: "/dashboard/staff", icon: Users },
+  { label: "Orders", href: "/dashboard/orders", icon: Receipt },
+  { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
+  { label: "Customers", href: "/dashboard/customers", icon: Users },
+  { label: "Reviews", href: "/dashboard/reviews", icon: Star },
+  { label: "Offers", href: "/dashboard/offers", icon: Tag },
+  { label: "Staff", href: "/dashboard/staff", icon: UserCog },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { staff, logout } = useAuthStore();
+
+  const handleLogout = () => {
+    logout();
+    router.replace("/login");
+  };
 
   return (
     <aside
@@ -96,6 +113,49 @@ export default function AdminSidebar() {
           );
         })}
       </nav>
+
+      <div
+        style={{
+          marginTop: 24,
+          paddingTop: 16,
+          borderTop: "1px solid #EAEAE5",
+        }}
+      >
+        {staff && (
+          <div
+            style={{
+              padding: "0 8px 10px",
+              fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
+              fontSize: 12,
+              color: "#4A4A45",
+            }}
+          >
+            <div style={{ fontWeight: 700 }}>{staff.name}</div>
+            <div style={{ color: "#999", textTransform: "capitalize" }}>{staff.role}</div>
+          </div>
+        )}
+        <button
+          onClick={handleLogout}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            width: "100%",
+            padding: "10px 12px",
+            borderRadius: 10,
+            border: "none",
+            background: "transparent",
+            cursor: "pointer",
+            fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
+            fontSize: 14,
+            fontWeight: 600,
+            color: "#C24C2E",
+          }}
+        >
+          <LogOut size={17} strokeWidth={2} />
+          Log out
+        </button>
+      </div>
     </aside>
   );
 }

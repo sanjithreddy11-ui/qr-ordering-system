@@ -1,0 +1,15 @@
+# dependencies
+/node_modules
+
+# env files — contains live secrets (Mongo URI, JWT_SECRET). Never commit.
+.env
+.env.*
+!.env.example
+
+# uploaded admin images (local dev storage)
+/public/uploads/*
+!/public/uploads/.gitkeep
+
+# misc
+.DS_Store
+npm-debug.log*

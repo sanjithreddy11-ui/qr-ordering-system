@@ -1,8 +1,10 @@
 require("dotenv").config();
+const bcrypt = require("bcryptjs");
 const connectDB = require("../config/db");
 const MenuItem = require("../models/MenuItem");
 const Table = require("../models/Table");
 const Restaurant = require("../models/Restaurant");
+const Staff = require("../models/Staff");
 const { RESTAURANT_ID, buildMenuItemDocs } = require("./menuData");
 const { DEMO_TABLES } = require("../config/tables");
 
@@ -45,6 +47,25 @@ async function seed() {
   for (const t of DEMO_TABLES) {
     await Table.findOneAndUpdate({ token: t.token }, t, { upsert: true, new: true });
   }
+
+  // Default admin login for the dashboard — replaces the old hardcoded
+  // frontend check (admin@lifafa.com / lifafa123) with a real Staff record
+  // now that /api/auth/login validates against this collection.
+  console.log("Seeding default admin account...");
+  const defaultPasswordHash = await bcrypt.hash("lifafa123", 10);
+  await Staff.findOneAndUpdate(
+    { restaurantId: RESTAURANT_ID, email: "admin@lifafa.com" },
+    {
+      restaurantId: RESTAURANT_ID,
+      name: "Lifafa Admin",
+      role: "admin",
+      email: "admin@lifafa.com",
+      phone: "",
+      passwordHash: defaultPasswordHash,
+      isActive: true,
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
 
   console.log("Seed complete.");
   process.exit(0);

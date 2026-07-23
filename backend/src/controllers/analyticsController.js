@@ -82,4 +82,44 @@ const getAnalytics = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { getAnalytics };
+// GET /api/orders/analytics/peak-hours?restaurantId=lifafa&from=&to=
+// Order volume grouped by hour-of-day (0-23), defaulting to the last 30
+// days. Powers the Peak Hours chart on the Analytics page.
+const getPeakHours = asyncHandler(async (req, res) => {
+  const { restaurantId, from, to } = req.query;
+
+  if (!restaurantId) {
+    throw new ApiError(400, "restaurantId query param is required");
+  }
+
+  const toDate = to ? new Date(to) : new Date();
+  const fromDate = from ? new Date(from) : new Date(toDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  const rows = await Order.aggregate([
+    {
+      $match: {
+        restaurantId,
+        status: { $ne: "cancelled" },
+        placedAt: { $gte: fromDate, $lte: toDate },
+      },
+    },
+    {
+      $group: {
+        _id: { $hour: "$placedAt" },
+        orderCount: { $sum: 1 },
+        revenue: { $sum: "$totalAmount" },
+      },
+    },
+  ]);
+
+  const countByHour = Object.fromEntries(rows.map((r) => [r._id, { orderCount: r.orderCount, revenue: r.revenue }]));
+  const hours = Array.from({ length: 24 }, (_, hour) => ({
+    hour,
+    orderCount: countByHour[hour]?.orderCount ?? 0,
+    revenue: countByHour[hour]?.revenue ?? 0,
+  }));
+
+  res.json({ hours });
+});
+
+module.exports = { getAnalytics, getPeakHours };

@@ -9,6 +9,8 @@ export interface OrderItem {
 }
 
 export interface CheckoutForm {
+  customerName: string;
+  customerPhone: string;
   orderType: "dine-in" | "takeaway";
   specialInstructions: string;
   paymentMethod: PaymentMethod;
@@ -20,6 +22,8 @@ export interface Order {
   restaurantId: string;
   tableToken: string;       // opaque token from QR code; backend resolves to real table
   tableLabel?: string | null;
+  customerName?: string;
+  customerPhone?: string;
   items: OrderItem[];
   subtotal: number;
   taxAmount: number;

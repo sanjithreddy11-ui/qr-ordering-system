@@ -33,6 +33,8 @@ export default function CheckoutPage() {
   const total = totalAmount();
 
   const [form, setForm] = useState<CheckoutForm>({
+    customerName: "",
+    customerPhone: "",
     orderType: "dine-in",
     specialInstructions: "",
     paymentMethod: "upi",
@@ -45,6 +47,16 @@ export default function CheckoutPage() {
   const handlePlaceOrder = async () => {
     if (!sessionId) {
       setError("Your session couldn't be found. Please go back to the menu and try again.");
+      return;
+    }
+    const name = form.customerName.trim();
+    const phone = form.customerPhone.trim();
+    if ((name && !phone) || (phone && !name)) {
+      setError("Please enter both your name and phone number, or leave both blank.");
+      return;
+    }
+    if (phone && !/^\d{7,15}$/.test(phone)) {
+      setError("Please enter a valid phone number.");
       return;
     }
 
@@ -60,6 +72,8 @@ export default function CheckoutPage() {
         orderType: form.orderType,
         specialInstructions: form.specialInstructions,
         paymentMethod: form.paymentMethod,
+        customerName: name || undefined,
+        customerPhone: phone || undefined,
       });
 
       setOrder(order);
@@ -277,6 +291,34 @@ export default function CheckoutPage() {
             taxAmount={tax}
             totalAmount={total}
           />
+
+          {/* Your Details — used for order updates and our Top Customers program; optional */}
+          <div style={glassCardStyle}>
+            <p style={labelStyle}>Your Details (optional)</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <input
+                type="text"
+                placeholder="Your name"
+                value={form.customerName}
+                onChange={(e) =>
+                  setForm((f: CheckoutForm) => ({ ...f, customerName: e.target.value }))
+                }
+                style={inputStyle}
+              />
+              <input
+                type="tel"
+                placeholder="Phone number"
+                value={form.customerPhone}
+                onChange={(e) =>
+                  setForm((f: CheckoutForm) => ({
+                    ...f,
+                    customerPhone: e.target.value.replace(/[^\d]/g, ""),
+                  }))
+                }
+                style={inputStyle}
+              />
+            </div>
+          </div>
 
           {/* Order Type — dine-in vs takeaway only, no table input */}
           <div style={glassCardStyle}>

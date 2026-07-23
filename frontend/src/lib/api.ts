@@ -33,6 +33,8 @@ export interface PlaceOrderPayload {
   orderType: "dine-in" | "takeaway";
   specialInstructions: string;
   paymentMethod: PaymentMethod;
+  customerName?: string;
+  customerPhone?: string;
 }
 
 export async function placeOrder(payload: PlaceOrderPayload): Promise<Order> {

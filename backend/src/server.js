@@ -7,6 +7,11 @@ const { initSocket } = require("./sockets/socket");
 const PORT = process.env.PORT || 5000;
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:3000";
 
+if (!process.env.JWT_SECRET) {
+  console.error("Missing JWT_SECRET in .env file");
+  process.exit(1);
+}
+
 async function start() {
   await connectDB();
 

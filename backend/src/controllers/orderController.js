@@ -3,6 +3,7 @@ const MenuItem = require("../models/MenuItem");
 const Table = require("../models/Table");
 const Session = require("../models/Session");
 const TableSession = require("../models/TableSession");
+const Customer = require("../models/Customer");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
 const generateOrderId = require("../utils/generateOrderId");
@@ -78,10 +79,18 @@ const createOrder = asyncHandler(async (req, res) => {
     orderType,
     specialInstructions,
     paymentMethod,
+    customerName,
+    customerPhone,
   } = req.body;
 
   if (!sessionId) {
     throw new ApiError(400, "sessionId is required");
+  }
+  // Name/phone are optional (guest checkout stays supported), but if either
+  // is provided we require both — a phone number with no name (or vice
+  // versa) isn't useful for Customer analytics and is more likely a typo.
+  if ((customerName && !customerPhone) || (customerPhone && !customerName)) {
+    throw new ApiError(400, "Provide both name and phone, or leave both blank");
   }
   if (!clientRestaurantId || !tableToken || !Array.isArray(items) || items.length === 0) {
     throw new ApiError(400, "restaurantId, tableToken and at least one item are required");
@@ -164,6 +173,8 @@ const createOrder = asyncHandler(async (req, res) => {
     restaurantId,
     tableToken: table.token,
     tableLabel: table.label,
+    customerName: customerName ? customerName.trim() : "",
+    customerPhone: customerPhone ? customerPhone.trim() : "",
     items: orderItems,
     subtotal,
     taxAmount,
@@ -208,10 +219,13 @@ const getOrderById = asyncHandler(async (req, res) => {
   res.json({ order });
 });
 
-// GET /api/orders?restaurantId=cafe-001&status=pending,preparing
-// Used by the kitchen dashboard to load its initial order list.
+// GET /api/orders?restaurantId=cafe-001&status=pending,preparing&search=&from=&to=&limit=
+// Used by the kitchen dashboard (restaurantId + status only) AND the admin
+// Orders page (adds search across orderId/customerName/customerPhone/
+// tableLabel, a placedAt date range, and a configurable limit). All the
+// new params are optional so existing callers are unaffected.
 const listOrders = asyncHandler(async (req, res) => {
-  const { restaurantId, status } = req.query;
+  const { restaurantId, status, search, from, to, limit } = req.query;
 
   if (!restaurantId) {
     throw new ApiError(400, "restaurantId query param is required");
@@ -221,8 +235,19 @@ const listOrders = asyncHandler(async (req, res) => {
   if (status) {
     filter.status = { $in: String(status).split(",") };
   }
+  if (search) {
+    const regex = new RegExp(search.trim(), "i");
+    filter.$or = [{ orderId: regex }, { customerName: regex }, { customerPhone: regex }, { tableLabel: regex }];
+  }
+  if (from || to) {
+    filter.placedAt = {};
+    if (from) filter.placedAt.$gte = new Date(from);
+    if (to) filter.placedAt.$lte = new Date(to);
+  }
 
-  const orders = await Order.find(filter).sort({ placedAt: -1 }).limit(200);
+  const cappedLimit = Math.min(500, Math.max(1, Number(limit) || 200));
+
+  const orders = await Order.find(filter).sort({ placedAt: -1 }).limit(cappedLimit);
   res.json({ orders });
 });
 
@@ -236,15 +261,44 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     throw new ApiError(400, `status must be one of: ${Order.STATUSES.join(", ")}`);
   }
 
+  const previous = await Order.findOne({ orderId: req.params.orderId });
+  if (!previous) throw new ApiError(404, "Order not found");
+
   const order = await Order.findOneAndUpdate(
     { orderId: req.params.orderId },
-    { status },
+    { status, $push: { statusHistory: { status, changedAt: new Date() } } },
     { new: true }
   );
 
-  if (!order) throw new ApiError(404, "Order not found");
-
   emitOrderStatusUpdate(order);
+
+  // Roll the order into Customer stats exactly once, the moment it first
+  // becomes "completed" — guarded by `previous.status !== "completed"` so
+  // re-saving an already-completed order (or any other status change)
+  // never double-counts it.
+  if (status === "completed" && previous.status !== "completed" && order.customerPhone) {
+    const existing = await Customer.findOne({
+      restaurantId: order.restaurantId,
+      phone: order.customerPhone,
+    });
+
+    const totalOrders = (existing?.totalOrders ?? 0) + 1;
+    const totalSpent = (existing?.totalSpent ?? 0) + order.totalAmount;
+
+    await Customer.findOneAndUpdate(
+      { restaurantId: order.restaurantId, phone: order.customerPhone },
+      {
+        restaurantId: order.restaurantId,
+        phone: order.customerPhone,
+        name: order.customerName || existing?.name || "Guest",
+        totalOrders,
+        totalSpent,
+        averageOrderValue: Math.round(totalSpent / totalOrders),
+        lastVisit: order.placedAt,
+      },
+      { upsert: true, new: true }
+    );
+  }
 
   res.json({ order });
 });

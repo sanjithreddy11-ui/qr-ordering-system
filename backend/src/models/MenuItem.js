@@ -21,6 +21,7 @@ const menuItemSchema = new mongoose.Schema(
     image: { type: String, default: "" },
     isAvailable: { type: Boolean, default: true },
     sortOrder: { type: Number, default: 0 },
+    prepTimeMinutes: { type: Number, default: 10 },
   },
   { timestamps: true }
 );

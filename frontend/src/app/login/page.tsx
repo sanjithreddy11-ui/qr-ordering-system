@@ -3,34 +3,44 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Mail, Lock, Eye, EyeOff, Flame } from "lucide-react";
+import { adminLogin } from "@/lib/admin-api";
+import { useAuthStore } from "@/store/auth-store";
+
+const RESTAURANT_ID = "lifafa"; // TODO: make dynamic if you support multiple restaurants
 
 export default function LoginPage() {
   const router = useRouter();
+  const { token, setSession } = useAuthStore();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const isAuthenticated = localStorage.getItem("isAuthenticated");
+    useAuthStore.persist.rehydrate();
+  }, []);
 
-    if (isAuthenticated === "true") {
+  useEffect(() => {
+    if (token) {
       router.replace("/dashboard");
     }
-  }, [router]);
+  }, [token, router]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
+    setLoading(true);
 
-    if (
-      email === "admin@lifafa.com" &&
-      password === "lifafa123"
-    ) {
-      localStorage.setItem("isAuthenticated", "true");
+    try {
+      const { token: newToken, staff } = await adminLogin(RESTAURANT_ID, email, password);
+      setSession(newToken, staff);
       router.push("/dashboard");
-    } else {
-      setError("Invalid email or password");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Invalid email or password");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -47,7 +57,7 @@ export default function LoginPage() {
           </h1>
 
           <p className="mt-2 text-gray-400">
-            Kitchen Dashboard Login
+            Admin Dashboard Login
           </p>
         </div>
 
@@ -105,9 +115,10 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="w-full rounded-xl bg-gradient-to-r from-orange-500 to-red-500 py-3 font-semibold text-white transition hover:opacity-90"
+            disabled={loading}
+            className="w-full rounded-xl bg-gradient-to-r from-orange-500 to-red-500 py-3 font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
           >
-            Login
+            {loading ? "Signing in…" : "Login"}
           </button>
 
           <div className="mt-4 text-center text-sm text-gray-500">

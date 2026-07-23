@@ -27,6 +27,12 @@ const orderSchema = new mongoose.Schema(
     tableToken: { type: String, required: true },
     tableLabel: { type: String, default: null }, // resolved friendly name e.g. "Table 4"
 
+    // Collected once at checkout. Optional so guest checkout keeps working;
+    // used to power Customer analytics (see models/Customer.js) once an
+    // order reaches "completed".
+    customerName: { type: String, default: "" },
+    customerPhone: { type: String, default: "", index: true },
+
     items: { type: [orderItemSchema], required: true },
 
     subtotal: { type: Number, required: true },
@@ -38,6 +44,17 @@ const orderSchema = new mongoose.Schema(
     paymentMethod: { type: String, enum: ["upi", "cash", "card"], required: true },
 
     status: { type: String, enum: ORDER_STATUSES, default: "pending", index: true },
+    // Timeline shown on the admin Orders page — one entry per status the
+    // order has passed through, in order.
+    statusHistory: {
+      type: [
+        {
+          status: { type: String, enum: ORDER_STATUSES, required: true },
+          changedAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: () => [{ status: "pending", changedAt: new Date() }],
+    },
 
     placedAt: { type: Date, default: Date.now },
     estimatedMinutes: { type: Number, default: 20 },
