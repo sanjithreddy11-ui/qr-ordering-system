@@ -2,7 +2,7 @@
 // add/remove/relabel tables — nothing else in the backend should hardcode
 // table tokens. Re-run `npm run seed` after changing this.
 
-const DEMO_RESTAURANT_ID = "lifafa";
+const DEMO_RESTAURANT_ID = "MAXIBREW";
 
 // Fixed, unguessable per-table tokens (not sequential IDs like "tbl_1").
 // These stay constant for the demo so printed QR codes keep working.

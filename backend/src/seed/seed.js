@@ -31,6 +31,21 @@ async function seed() {
 
   const menuDocs = buildMenuItemDocs();
 
+  // Full replace, not merge: delete any menu item for this restaurant that
+  // isn't in the current menuData.js before upserting. Without this, old
+  // items (including ones hand-edited via the Admin Menu Management
+  // screen) stick around forever since findOneAndUpdate below only
+  // adds/updates by id — it never removes items that were dropped from
+  // menuData.js.
+  const currentIds = menuDocs.map((d) => d.id);
+  const { deletedCount } = await MenuItem.deleteMany({
+    restaurantId: RESTAURANT_ID,
+    id: { $nin: currentIds },
+  });
+  if (deletedCount > 0) {
+    console.log(`Removed ${deletedCount} stale menu item(s) no longer in menuData.js...`);
+  }
+
   console.log(`Seeding ${menuDocs.length} menu items for ${RESTAURANT_ID}...`);
   for (const doc of menuDocs) {
     await MenuItem.findOneAndUpdate(

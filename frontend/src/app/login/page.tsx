@@ -53,7 +53,7 @@ export default function LoginPage() {
           </div>
 
           <h1 className="text-3xl font-bold text-white">
-            Lifafa Cafe
+            MaxiBrew Cafe
           </h1>
 
           <p className="mt-2 text-gray-400">
@@ -121,13 +121,7 @@ export default function LoginPage() {
             {loading ? "Signing in…" : "Login"}
           </button>
 
-          <div className="mt-4 text-center text-sm text-gray-500">
-            Demo Credentials:
-            <br />
-            admin@lifafa.com
-            <br />
-            lifafa123
-          </div>
+         
         </form>
       </div>
     </div>

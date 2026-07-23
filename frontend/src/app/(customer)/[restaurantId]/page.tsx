@@ -17,8 +17,8 @@ import InformationSection, {
 // still fetches its own data as before). Edit these values directly to
 // rebrand: swap copy, swap /new-assets/* paths, done.
 const restaurant = {
-  name: "Ebowla Club",
-  logo: "/logo.png",
+  name: "MAXIBREW",
+  logo: "/logo1.png",
   tagline: "A place where the ordinary ends, and the extraordinary begins!",
   heroVideo: "/new-assets/floral.mp4",
   aboutText:
@@ -99,7 +99,6 @@ export default function CafeLandingPage() {
         onExploreMenu={goToMenu}
       />
 
-      <EventsSection events={restaurant.events} />
 
       <InformationSection
         hours={restaurant.hours}

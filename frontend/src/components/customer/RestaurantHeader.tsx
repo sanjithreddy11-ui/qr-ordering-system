@@ -16,7 +16,7 @@ export default function RestaurantHeader() {
           className="font-display text-[34px] font-semibold text-green-primary"
           style={{ letterSpacing: "2px" }}
         >
-          E-BOWLA CLUB
+          MAXIBREW
         </h1>
         <Image
           src="/assets/hanko.svg"

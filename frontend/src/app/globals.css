@@ -41,7 +41,13 @@ html,
 body {
   min-height: 100dvh;
   background: var(--bg-primary);
-  overflow-x: hidden;
+  /* overflow-x: hidden (instead of clip) implicitly sets overflow-y: auto
+     per the CSS overflow spec, turning <body> into its own scroll
+     container. That breaks position:sticky elements inside it (e.g. the
+     menu page's search/filter bar), since sticky then tracks body's
+     scrollport instead of the viewport. `clip` blocks horizontal overflow
+     the same way without that side effect. */
+  overflow-x: clip;
 }
 
 body {
