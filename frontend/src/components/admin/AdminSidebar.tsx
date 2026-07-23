@@ -28,7 +28,6 @@ const NAV_ITEMS = [
   { label: "Reviews", href: "/dashboard/reviews", icon: Star },
   { label: "Offers", href: "/dashboard/offers", icon: Tag },
   { label: "Staff", href: "/dashboard/staff", icon: UserCog },
-  { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 export default function AdminSidebar() {
   const pathname = usePathname();

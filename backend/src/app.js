@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const menuRoutes = require("./routes/menuRoutes");
 const orderRoutes = require("./routes/orderRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
 const sessionRoutes = require("./routes/sessionRoutes");
 const restaurantRoutes = require("./routes/restaurantRoutes");
 const adminMenuRoutes = require("./routes/adminMenuRoutes");
@@ -30,6 +31,7 @@ function createApp(clientOrigin) {
 
   app.use("/api/menu", menuRoutes);
   app.use("/api/orders", orderRoutes);
+  app.use("/api/payments", paymentRoutes);
   app.use("/api/sessions", sessionRoutes);
   app.use("/api/restaurants", restaurantRoutes);
   app.use("/api/auth", authRoutes);

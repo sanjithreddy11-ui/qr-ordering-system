@@ -115,3 +115,45 @@ export async function fetchRestaurant(restaurantId: string): Promise<Restaurant>
   const data = await handle<{ restaurant: Restaurant }>(res);
   return data.restaurant;
 }
+
+// --- Razorpay Standard Checkout (upi/card) ---
+// Same payload shape as placeOrder above — this is the online-payment
+// counterpart of POST /api/orders. The order itself is NOT created by
+// this call; see verifyRazorpayPayment below.
+export type CreateRazorpayOrderPayload = PlaceOrderPayload;
+
+export interface CreateRazorpayOrderResponse {
+  razorpayOrderId: string;
+  amount: number; // in paise
+  currency: string;
+  keyId: string;
+}
+
+export async function createRazorpayOrder(
+  payload: CreateRazorpayOrderPayload
+): Promise<CreateRazorpayOrderResponse> {
+  const res = await fetch(API_ENDPOINTS.paymentsCreateOrder(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return handle<CreateRazorpayOrderResponse>(res);
+}
+
+export interface VerifyPaymentPayload {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+}
+
+// Only once this succeeds does the backend create the real order — the
+// response shape matches placeOrder's, so callers can treat both the same.
+export async function verifyRazorpayPayment(payload: VerifyPaymentPayload): Promise<Order> {
+  const res = await fetch(API_ENDPOINTS.paymentsVerify(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await handle<{ order: Order }>(res);
+  return data.order;
+}

@@ -43,6 +43,14 @@ const orderSchema = new mongoose.Schema(
     specialInstructions: { type: String, default: "" },
     paymentMethod: { type: String, enum: ["upi", "cash", "card"], required: true },
 
+    // "paid" only ever gets set by the payment verification flow (see
+    // controllers/paymentController.js) after a Razorpay signature check
+    // succeeds. Cash orders (and any pre-existing orders) stay "pending",
+    // which is the same as "collected at the counter, not tracked here".
+    paymentStatus: { type: String, enum: ["pending", "paid"], default: "pending" },
+    razorpayOrderId: { type: String, default: null },
+    razorpayPaymentId: { type: String, default: null },
+
     status: { type: String, enum: ORDER_STATUSES, default: "pending", index: true },
     // Timeline shown on the admin Orders page — one entry per status the
     // order has passed through, in order.

@@ -34,4 +34,8 @@ export interface Order {
   status: OrderStatus;
   placedAt: string;         // ISO timestamp
   estimatedMinutes: number;
+  // Only present on orders created via the Razorpay (upi/card) flow.
+  paymentStatus?: "pending" | "paid";
+  razorpayOrderId?: string | null;
+  razorpayPaymentId?: string | null;
 }

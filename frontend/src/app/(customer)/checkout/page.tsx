@@ -10,7 +10,8 @@ import { useCartStore } from "@/store/cart-store";
 import { useOrderStore } from "@/store/order-store";
 import { useSessionStore } from "@/store/session-store";
 import { CheckoutForm, PaymentMethod } from "@/types/order";
-import { placeOrder } from "@/lib/api";
+import { placeOrder, createRazorpayOrder, verifyRazorpayPayment } from "@/lib/api";
+import { loadRazorpayCheckout, RazorpaySuccessResponse } from "@/lib/razorpay";
 import CartBackground from "@/components/customer/CartBackground";
 import OrderSummaryCard from "@/components/customer/OrderSummaryCard";
 import PaymentMethodSelector from "@/components/customer/PaymentMethodSelector";
@@ -61,26 +62,94 @@ export default function CheckoutPage() {
     setPlacing(true);
     setError(null);
 
+    const orderPayload = {
+      sessionId,
+      restaurantId,
+      tableToken,
+      items: items.map((e) => ({ id: e.item.id, quantity: e.quantity })),
+      orderType: form.orderType,
+      specialInstructions: form.specialInstructions,
+      paymentMethod: form.paymentMethod,
+      customerName: name || undefined,
+      customerPhone: phone || undefined,
+    };
+
+    // Cash stays "pay at counter" — unchanged, creates the order right away.
+    if (form.paymentMethod === "cash") {
+      try {
+        const order = await placeOrder(orderPayload);
+        setOrder(order);
+        router.push("/order-success");
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Couldn't place your order. Please try again."
+        );
+        setPlacing(false);
+      }
+      return;
+    }
+
+    // UPI / Card pay online via Razorpay Standard Checkout. The order is
+    // only created after the payment is verified server-side (see
+    // handlePaymentSuccess below) — never on the frontend's say-so.
     try {
-      const order = await placeOrder({
-        sessionId,
-        restaurantId,
-        tableToken,
-        items: items.map((e) => ({ id: e.item.id, quantity: e.quantity })),
-        orderType: form.orderType,
-        specialInstructions: form.specialInstructions,
-        paymentMethod: form.paymentMethod,
-        customerName: name || undefined,
-        customerPhone: phone || undefined,
+      const scriptReady = await loadRazorpayCheckout();
+      if (!scriptReady) {
+        setError("Couldn't load the payment gateway. Please check your connection and try again.");
+        setPlacing(false);
+        return;
+      }
+
+      const { razorpayOrderId, amount, currency, keyId } = await createRazorpayOrder(orderPayload);
+
+      const handlePaymentSuccess = async (response: RazorpaySuccessResponse) => {
+        try {
+          const order = await verifyRazorpayPayment({
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+          });
+          setOrder(order);
+          router.push("/order-success");
+        } catch (err) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "We couldn't confirm your payment. If you were charged, please show this screen to staff."
+          );
+          setPlacing(false);
+        }
+      };
+
+      const razorpayCheckout = new window.Razorpay({
+        key: keyId,
+        amount,
+        currency,
+        name: "SmartQR",
+        description: `Order for ${form.orderType === "dine-in" ? "Table" : "Takeaway"}`,
+        order_id: razorpayOrderId,
+        prefill: { name: name || undefined, contact: phone || undefined },
+        theme: { color: "#3A4C3B" },
+        method: { upi: form.paymentMethod === "upi", card: form.paymentMethod === "card" },
+        handler: handlePaymentSuccess,
+        modal: {
+          ondismiss: () => setPlacing(false),
+        },
       });
 
-      setOrder(order);
-      router.push("/order-success");
+      razorpayCheckout.on("payment.failed", (resp) => {
+        setError(resp.error?.description || "Payment failed. Please try again.");
+        setPlacing(false);
+      });
+
+      razorpayCheckout.open();
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Couldn't place your order. Please try again."
+          : "Couldn't start payment. Please try again."
       );
       setPlacing(false);
     }
