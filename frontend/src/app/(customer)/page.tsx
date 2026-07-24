@@ -1,6 +1,5 @@
 "use client";
-
-import React from "react";
+import React, { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Leaf, Coffee, Heart, Users } from "lucide-react";
 import HeroSection from "@/components/customer/HeroSection";
@@ -65,7 +64,7 @@ const restaurant = {
   // TODO: replace with real registration details before launch.
 };
 
-export default function CafeLandingPage() {
+function CafeLandingPageInner() {
   const searchParams = useSearchParams();
   const table = searchParams.get("table");
   const router = useRouter();
@@ -104,5 +103,13 @@ export default function CafeLandingPage() {
         social={restaurant.social}
       />
     </main>
+  );
+}
+
+export default function CafeLandingPage() {
+  return (
+    <Suspense fallback={null}>
+      <CafeLandingPageInner />
+    </Suspense>
   );
 }
