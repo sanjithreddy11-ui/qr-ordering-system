@@ -31,7 +31,12 @@ export default function MenuPage() {
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterValue>("all");
+  // null = "haven't heard back yet" (show a skeleton, not mock data).
+  // Real data (or the mock fallback) is only committed to state ONCE the
+  // fetch settles, so the menu with real content only ever renders a
+  // single time — no swap, no remount, no flicker.
   const [liveMenu, setLiveMenu] = useState<MenuCategory[] | null>(null);
+  const [menuLoading, setMenuLoading] = useState(true);
   const [groupOrderOpen, setGroupOrderOpen] = useState(false);
 
   const {
@@ -65,22 +70,30 @@ export default function MenuPage() {
 
   // Try loading the live menu from the backend. If the backend isn't
   // running yet (e.g. you're still developing the UI), silently fall back
-  // to the local mock data so the page never breaks.
+  // to the local mock data so the page never breaks. Either way, we only
+  // set state ONCE the outcome is known — we never paint mock data first
+  // and then swap it for different (differently-keyed) live data, which
+  // is what was causing the full category/card remount flicker.
   useEffect(() => {
     let cancelled = false;
     fetchMenu(restaurantId)
       .then((data) => {
-        if (!cancelled && data.length > 0) setLiveMenu(data);
+        if (cancelled) return;
+        setLiveMenu(data.length > 0 ? data : mockMenu);
       })
       .catch(() => {
-        // Backend not reachable — keep using mock data, no user-facing error.
+        // Backend not reachable — fall back to mock data, no user-facing error.
+        if (!cancelled) setLiveMenu(mockMenu);
+      })
+      .finally(() => {
+        if (!cancelled) setMenuLoading(false);
       });
     return () => {
       cancelled = true;
     };
   }, [restaurantId]);
 
-  const menu = liveMenu ?? mockMenu;
+  const menu = liveMenu ?? [];
 
   const filteredMenu = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -205,13 +218,24 @@ export default function MenuPage() {
         </div>
 
         <div className="px-6">
-          {filteredMenu.length === 0 && (
+          {menuLoading && (
+            <div className="flex flex-col gap-4 py-8" aria-label="Loading menu">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-28 w-full animate-pulse rounded-2xl bg-bg-secondary"
+                />
+              ))}
+            </div>
+          )}
+
+          {!menuLoading && filteredMenu.length === 0 && (
             <p className="font-body py-16 text-center text-[14px] text-text-secondary">
               No dishes match your search.
             </p>
           )}
 
-          {filteredMenu.map((category, idx) => (
+          {!menuLoading && filteredMenu.map((category, idx) => (
             <section
               key={category.id}
               id={`category-${category.id}`}
