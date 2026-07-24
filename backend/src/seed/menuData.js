@@ -1,7 +1,7 @@
 // Mirrors src/lib/menu-data.ts from the frontend so the database starts
 // with the same menu you've already been designing against.
 // If you edit the frontend mock later, update this file to match.
-const RESTAURANT_ID = "lifafa";
+const RESTAURANT_ID = "maxibrew";
 
 const rawMenu = [
   // ===================== NEW CATEGORIES (from Maxi Brew menu) =====================

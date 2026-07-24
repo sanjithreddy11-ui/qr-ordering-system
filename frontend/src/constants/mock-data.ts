@@ -1,5 +1,5 @@
 export const restaurant = {
-  id: "lifafa",
+  id: "maxibrew",
   name: "Smart Cafe",
   rating: 4.8,
   type: "Multi Cuisine",

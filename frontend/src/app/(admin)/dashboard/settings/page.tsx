@@ -5,7 +5,7 @@ import { Save } from "lucide-react";
 import { PageHeader, Card, PrimaryButton, TextInput, TextArea, adminColors } from "@/components/admin/ui";
 import { fetchRestaurantProfile, updateRestaurantProfile, RestaurantProfile } from "@/lib/admin-api";
 
-const RESTAURANT_ID = "lifafa"; // TODO: make dynamic if you support multiple restaurants
+const RESTAURANT_ID = "maxibrew"; // TODO: make dynamic if you support multiple restaurants
 
 export default function AdminSettingsPage() {
   const [profile, setProfile] = useState<RestaurantProfile | null>(null);

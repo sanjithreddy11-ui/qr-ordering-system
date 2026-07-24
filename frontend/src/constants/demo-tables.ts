@@ -2,7 +2,7 @@
 // This is the single source of truth for demo table tokens on the
 // frontend (used e.g. to generate/print demo QR links for testing).
 
-export const DEMO_RESTAURANT_SLUG = "lifafa";
+export const DEMO_RESTAURANT_SLUG = "maxibrew";
 
 export interface DemoTable {
   token: string;

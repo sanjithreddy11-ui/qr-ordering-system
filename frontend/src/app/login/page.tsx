@@ -6,7 +6,7 @@ import { Mail, Lock, Eye, EyeOff, Flame } from "lucide-react";
 import { adminLogin } from "@/lib/admin-api";
 import { useAuthStore } from "@/store/auth-store";
 
-const RESTAURANT_ID = "lifafa"; // TODO: make dynamic if you support multiple restaurants
+const RESTAURANT_ID = "maxibrew"; // TODO: make dynamic if you support multiple restaurants
 
 export default function LoginPage() {
   const router = useRouter();

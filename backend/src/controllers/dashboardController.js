@@ -23,7 +23,7 @@ async function revenueBetween(restaurantId, from, to) {
   return { revenue: row?.revenue ?? 0, orderCount: row?.orderCount ?? 0 };
 }
 
-// GET /api/admin/dashboard/summary?restaurantId=lifafa
+// GET /api/admin/dashboard/summary?restaurantId=maxibrew
 // Powers the 8 top-of-dashboard stat cards. Cheap, single-purpose
 // aggregations rather than one giant pipeline, since each figure has a
 // different match condition (today vs. all-time table state).
@@ -58,7 +58,7 @@ const getSummary = asyncHandler(async (req, res) => {
   });
 });
 
-// GET /api/admin/dashboard/revenue?restaurantId=lifafa
+// GET /api/admin/dashboard/revenue?restaurantId=maxibrew
 // Today / Yesterday / Last 7 days / Last 30 days revenue, for the Revenue
 // Analytics section (separate from the trend chart, which uses the
 // existing GET /api/orders/analytics dailyTotals).

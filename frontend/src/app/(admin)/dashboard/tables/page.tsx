@@ -20,7 +20,7 @@ import QrCodesTab from "@/components/admin/tables/QrCodesTab";
 import { STATUS_FILTERS, STATUS_META } from "@/components/admin/tables/tableStatus";
 import { TablePrimaryButton } from "@/components/admin/tables/tableButtons";
 
-const RESTAURANT_ID = "lifafa"; // TODO: make dynamic if you support multiple restaurants
+const RESTAURANT_ID = "maxibrew"; // TODO: make dynamic if you support multiple restaurants
 
 type Tab = "grid" | "reservations" | "qr";
 

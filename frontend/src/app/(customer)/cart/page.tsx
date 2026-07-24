@@ -4,13 +4,14 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useCartStore } from "@/store/cart-store";
-import { useSessionStore } from "@/store/session-store";
+import { useBuildCustomerUrl } from "@/lib/customer-nav";
 import CartItemCard from "@/components/customer/CartItemCard";
 import BillSummary from "@/components/customer/BillSummary";
 import CartBackground from "@/components/customer/CartBackground";
 
 export default function CartPage() {
   const router = useRouter();
+  const buildCustomerUrl = useBuildCustomerUrl();
 
   const {
     items,
@@ -18,9 +19,6 @@ export default function CartPage() {
     taxAmount,
     totalAmount,
   } = useCartStore();
-
-  const restaurantId = useSessionStore((s) => s.restaurantId) ?? "cafe-001";
-  const menuHref = `/${restaurantId}/menu`;
 
   const sub = subtotal();
   const tax = taxAmount();
@@ -44,7 +42,7 @@ export default function CartPage() {
 
          <motion.button
   whileTap={{ scale: 0.96 }}
-  onClick={() => router.push(menuHref)}
+  onClick={() => router.push(buildCustomerUrl("/menu"))}
   className="font-body rounded-full px-7 py-4 text-sm font-semibold text-bg-primary shadow-lg transition"
   style={{
     background: "linear-gradient(135deg, #3A4C3B 0%, #263429 100%)",
@@ -68,7 +66,7 @@ export default function CartPage() {
           <div className="flex items-center gap-3">
             <motion.button
   whileTap={{ scale: 0.96 }}
-  onClick={() => router.push(menuHref)}
+  onClick={() => router.push(buildCustomerUrl("/menu"))}
   className="font-body flex h-10 w-10 items-center justify-center rounded-full text-lg text-bg-primary shadow-lg"
   style={{
     background: "linear-gradient(135deg, #3A4C3B 0%, #263429 100%)",
@@ -117,24 +115,22 @@ export default function CartPage() {
       {/* Proceed Button */}
       <div className="fixed bottom-4 left-0 right-0 z-[999] mx-auto w-[calc(100%-32px)] max-w-[448px] px-4">
         <motion.button
-  whileTap={{ scale: 0.97 }}
-  onClick={() => router.push("/checkout")}
-  className="font-body flex w-full items-center justify-between rounded-full px-6 py-4 text-[15px] font-semibold text-bg-primary shadow-lg"
-  style={{
-    background: "linear-gradient(135deg, #3A4C3B 0%, #263429 100%)",
-    letterSpacing: "0.3px",
-  }}
->
-  <span className="font-body text-sm opacity-90">
-    ₹ {total}
-  </span>
+          whileTap={{ scale: 0.97 }}
+          onClick={() => router.push(buildCustomerUrl("/checkout"))}
+          className="font-body flex h-14 w-full items-center justify-between gap-3 rounded-full px-6 text-bg-primary shadow-lg"
+          style={{
+            background: "linear-gradient(135deg, #3A4C3B 0%, #263429 100%)",
+            letterSpacing: "0.3px",
+          }}
+        >
+          <span className="font-body whitespace-nowrap text-sm font-semibold leading-none opacity-90">
+            ₹{total}
+          </span>
 
-  <span className="font-body text-[15px] font-semibold">
-    Proceed to Checkout →
-  </span>
-
-  <span className="w-[60px]" />
-</motion.button>
+          <span className="font-body whitespace-nowrap text-[15px] font-semibold leading-none">
+            Proceed to Checkout →
+          </span>
+        </motion.button>
       </div>
     </main>
   );

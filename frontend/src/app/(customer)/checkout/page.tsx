@@ -9,6 +9,8 @@ import { motion } from "framer-motion";
 import { useCartStore } from "@/store/cart-store";
 import { useOrderStore } from "@/store/order-store";
 import { useSessionStore } from "@/store/session-store";
+import { useBuildCustomerUrl } from "@/lib/customer-nav";
+import { RESTAURANT_ID } from "@/constants/restaurant";
 import { CheckoutForm, PaymentMethod } from "@/types/order";
 import { placeOrder, createRazorpayOrder, verifyRazorpayPayment } from "@/lib/api";
 import { loadRazorpayCheckout, RazorpaySuccessResponse } from "@/lib/razorpay";
@@ -18,14 +20,15 @@ import PaymentMethodSelector from "@/components/customer/PaymentMethodSelector";
 
 export default function CheckoutPage() {
   const router = useRouter();
+  const buildCustomerUrl = useBuildCustomerUrl();
   const { items, subtotal, taxAmount, totalAmount, clearCart } = useCartStore();
   const {
     sessionId,
     restaurantId: sessionRestaurantId,
     tableToken: sessionTableToken,
   } = useSessionStore();
-  const restaurantId = sessionRestaurantId ?? "cafe-001";
-  const tableToken = sessionTableToken ?? "tbl_demo01";
+  const restaurantId = sessionRestaurantId ?? RESTAURANT_ID;
+  const tableToken = sessionTableToken ?? "";
 
   const sub = subtotal();
   const tax = taxAmount();
@@ -83,7 +86,7 @@ export default function CheckoutPage() {
       try {
         const order = await placeOrder(orderPayload);
         setOrder(order);
-        router.push("/order-success");
+        router.push(buildCustomerUrl("/order-success"));
       } catch (err) {
         setError(
           err instanceof Error
@@ -116,7 +119,7 @@ export default function CheckoutPage() {
             razorpay_signature: response.razorpay_signature,
           });
           setOrder(order);
-          router.push("/order-success");
+          router.push(buildCustomerUrl("/order-success"));
         } catch (err) {
           setError(
             err instanceof Error
@@ -139,6 +142,7 @@ export default function CheckoutPage() {
         method: { upi: form.paymentMethod === "upi", card: form.paymentMethod === "card" },
         handler: handlePaymentSuccess,
         modal: {
+          // Customer closed the popup without paying — let them try again.
           ondismiss: () => setPlacing(false),
         },
       });
@@ -158,8 +162,6 @@ export default function CheckoutPage() {
       setPlacing(false);
     }
   };
-
-  const backToMenuHref = `/${restaurantId}/menu`;
 
   const glassCardStyle: React.CSSProperties = {
     background: "rgba(255,255,255,0.55)",
@@ -245,7 +247,7 @@ export default function CheckoutPage() {
             Your cart is empty.
           </div>
           <button
-            onClick={() => router.push(backToMenuHref)}
+            onClick={() => router.push(buildCustomerUrl("/menu"))}
             style={{
               background: "linear-gradient(135deg, #3A4C3B 0%, #263429 100%)",
               color: "#fff",

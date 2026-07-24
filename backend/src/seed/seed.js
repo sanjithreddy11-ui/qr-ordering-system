@@ -18,7 +18,7 @@ async function seed() {
     { restaurantId: RESTAURANT_ID },
     {
       restaurantId: RESTAURANT_ID,
-      name: "Lifafa",
+      name: "Maxibrew",
       logo: "/logo.png",
       description:
         "A cozy neighborhood cafe serving fresh, seasonal comfort food and specialty drinks.",
@@ -56,7 +56,7 @@ async function seed() {
   }
 
   // Demo tables — the QR code for each physical table encodes a URL like:
-  //   https://yourapp.com/lifafa?table=8d3af2e91c
+  //   https://yourapp.com/?table=8d3af2e91c
   // Edit src/config/tables.js to add/remove/relabel tables.
   console.log(`Seeding ${DEMO_TABLES.length} demo tables...`);
   for (const t of DEMO_TABLES) {
@@ -64,17 +64,17 @@ async function seed() {
   }
 
   // Default admin login for the dashboard — replaces the old hardcoded
-  // frontend check (admin@lifafa.com / lifafa123) with a real Staff record
-  // now that /api/auth/login validates against this collection.
+  // frontend check (admin@maxibrew.com / maxibrew123) with a real Staff
+  // record now that /api/auth/login validates against this collection.
   console.log("Seeding default admin account...");
-  const defaultPasswordHash = await bcrypt.hash("lifafa123", 10);
+  const defaultPasswordHash = await bcrypt.hash("maxibrew123", 10);
   await Staff.findOneAndUpdate(
-    { restaurantId: RESTAURANT_ID, email: "admin@lifafa.com" },
+    { restaurantId: RESTAURANT_ID, email: "admin@maxibrew.com" },
     {
       restaurantId: RESTAURANT_ID,
-      name: "Lifafa Admin",
+      name: "Maxibrew Admin",
       role: "admin",
-      email: "admin@lifafa.com",
+      email: "admin@maxibrew.com",
       phone: "",
       passwordHash: defaultPasswordHash,
       isActive: true,

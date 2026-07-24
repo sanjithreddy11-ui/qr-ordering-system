@@ -18,6 +18,7 @@ import { useCartStore } from "@/store/cart-store";
 import { useSessionStore } from "@/store/session-store";
 import { useGroupOrderStore } from "@/store/group-order-store";
 import { useCustomerNavigate } from "@/lib/customer-nav";
+import { RESTAURANT_ID } from "@/constants/restaurant";
 import { fetchMenu } from "@/lib/api";
 
 export default function MenuPage() {
@@ -25,7 +26,7 @@ export default function MenuPage() {
   // token was already read once by the [restaurantId] layout; every page
   // after that reuses the stored value so it never goes stale or "null".
   const { restaurantSlug, tableToken } = useSessionStore();
-  const restaurantId = restaurantSlug ?? "lifafa";
+  const restaurantId = restaurantSlug ?? RESTAURANT_ID;
   const goTo = useCustomerNavigate();
 
   const [search, setSearch] = useState("");

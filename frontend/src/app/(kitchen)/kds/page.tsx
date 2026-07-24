@@ -35,8 +35,8 @@ import { getSocket } from "@/lib/socket";
 import { fetchOrdersForRestaurant, updateOrderStatus } from "@/lib/api";
 import type { Order, OrderStatus } from "@/types/order";
 
-const RESTAURANT_ID = "lifafa"; // TODO: make dynamic if you support multiple restaurants
-const RESTAURANT_NAME = "Lifafa Kitchen";
+const RESTAURANT_ID = "maxibrew"; // TODO: make dynamic if you support multiple restaurants
+const RESTAURANT_NAME = "Maxibrew Kitchen";
 
 // ---------------------------------------------------------------------------
 // Unchanged business constants (kept exactly as in the original implementation)
@@ -637,7 +637,7 @@ export default function KitchenDashboardPage() {
                   <div className="w-12 h-12 flex items-center justify-center">
   <Image
     src="/logo.png"
-    alt="Lifafa Logo"
+    alt="Maxibrew Logo"
     width={48}
     height={48}
     className="rounded-full object-cover"

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Leaf, Coffee, Heart, Users } from "lucide-react";
 import HeroSection from "@/components/customer/HeroSection";
 import AboutCafeSection, {
@@ -22,7 +22,7 @@ const restaurant = {
   tagline: "A place where the ordinary ends, and the extraordinary begins!",
   heroVideo: "/new-assets/floral.mp4",
   aboutText:
-    "Ebowla is more than just a club—it's an experience rooted in warmth, flavor, and community. Inspired by the joy of sharing good food and meaningful moments, we bring you a menu crafted with passion, served with love.",
+    "Maxibrew is more than just a cafe—it's an experience rooted in warmth, flavor, and community. Inspired by the joy of sharing good food and meaningful moments, we bring you a menu crafted with passion, served with love.",
 
   highlights: [
     { label: "Fresh Ingredients", icon: Leaf },
@@ -32,15 +32,15 @@ const restaurant = {
   ] satisfies AboutHighlight[],
 
   events: [
-    { id: "event-1", image: "/new-assets/events/event-1.webp", alt: "Upcoming event at E-BOWLA CLUB" },
-    { id: "event-2", image: "/new-assets/events/event-2.webp", alt: "Upcoming event at E-BOWLA CLUB" },
-    { id: "event-3", image: "/new-assets/events/event-3.webp", alt: "Upcoming event at E-BOWLA CLUB" },
-    { id: "event-4", image: "/new-assets/events/event-4.webp", alt: "Upcoming event at E-BOWLA CLUB" },
-    { id: "event-5", image: "/new-assets/events/event-5.webp", alt: "Upcoming event at E-BOWLA CLUB" },
+    { id: "event-1", image: "/new-assets/events/event-1.webp", alt: "Upcoming event at MAXIBREW" },
+    { id: "event-2", image: "/new-assets/events/event-2.webp", alt: "Upcoming event at MAXIBREW" },
+    { id: "event-3", image: "/new-assets/events/event-3.webp", alt: "Upcoming event at MAXIBREW" },
+    { id: "event-4", image: "/new-assets/events/event-4.webp", alt: "Upcoming event at MAXIBREW" },
+    { id: "event-5", image: "/new-assets/events/event-5.webp", alt: "Upcoming event at MAXIBREW" },
   ] satisfies EventItem[],
 
   // TODO: confirm real values — placeholders below follow the reference's
-  // format (Mon–Sun, same hours daily) but with E-BOWLA CLUB's own timing.
+  // format (Mon–Sun, same hours daily) but with MAXIBREW's own timing.
   hours: [
     { day: "Mon", hours: "8:00 AM – 11:00 PM" },
     { day: "Tue", hours: "8:00 AM – 11:00 PM" },
@@ -69,11 +69,9 @@ export default function CafeLandingPage() {
   const searchParams = useSearchParams();
   const table = searchParams.get("table");
   const router = useRouter();
-  const params = useParams<{ restaurantId: string }>();
-  const restaurantId = params.restaurantId;
 
   const goToMenu = () => {
-    router.push(`/${restaurantId}/menu${table ? `?table=${table}` : ""}`);
+    router.push(`/menu${table ? `?table=${table}` : ""}`);
   };
 
   return (

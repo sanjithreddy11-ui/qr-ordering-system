@@ -13,6 +13,7 @@ import {
 import { useOrderStore } from "@/store/order-store";
 import { OrderItem, Order, OrderStatus } from "@/types/order";
 import { getSocket } from "@/lib/socket";
+import { useBuildCustomerUrl } from "@/lib/customer-nav";
 import CartBackground from "@/components/customer/CartBackground";
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -33,6 +34,7 @@ const STATUS_META: Record<OrderStatus, { label: string; dot: string }> = {
 
 export default function OrderSuccessPage() {
   const router = useRouter();
+  const buildCustomerUrl = useBuildCustomerUrl();
   const { currentOrder, updateStatus, clearOrder } = useOrderStore();
   const [showItems, setShowItems] = useState(false);
 
@@ -115,7 +117,7 @@ export default function OrderSuccessPage() {
             No order found
           </div>
           <button
-            onClick={() => router.push("/")}
+            onClick={() => router.push(buildCustomerUrl("/"))}
             style={{
               background: "linear-gradient(135deg, #3A4C3B 0%, #263429 100%)",
               color: "#fff",
@@ -139,7 +141,6 @@ export default function OrderSuccessPage() {
 
   const {
     orderId,
-    restaurantId,
     items,
     totalAmount,
     orderType,
@@ -566,7 +567,7 @@ export default function OrderSuccessPage() {
           transition={{ delay: 0.8 }}
           whileTap={{ scale: 0.97 }}
           onClick={() => {
-            router.push(`/${restaurantId ?? "lifafa"}/menu`);
+            router.push(buildCustomerUrl("/menu"));
           }}
           style={{
             width: "100%",

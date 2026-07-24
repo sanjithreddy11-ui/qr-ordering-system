@@ -21,7 +21,7 @@ import { statusMeta, formatCurrency, formatDuration, formatTime } from "@/compon
 import { TablePrimaryButton } from "@/components/admin/tables/tableButtons";
 import ThermalReceipt from "@/components/admin/tables/ThermalReceipt";
 
-const RESTAURANT_ID = "lifafa";
+const RESTAURANT_ID = "maxibrew";
 
 const LIVE_EVENTS = [
   "new-order",

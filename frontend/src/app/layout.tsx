@@ -12,7 +12,7 @@ import "@fontsource/mrs-saint-delafield/400.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Lifafa  |Demo Menu",
+  title: "Maxibrew",
   description: "A quiet, handcrafted dining experience.",
 };
 

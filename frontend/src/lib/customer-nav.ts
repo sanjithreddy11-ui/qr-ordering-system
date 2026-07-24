@@ -3,39 +3,36 @@ import { useRouter } from "next/navigation";
 import { useSessionStore } from "@/store/session-store";
 
 /**
- * Pure function: builds a customer-facing URL for the given restaurant slug
- * and table token. Used directly wherever we don't have a React hook
- * available (e.g. inside plain functions), and internally by
- * `useBuildCustomerUrl`.
+ * Pure function: builds a customer-facing URL for the given path and table
+ * token. The app is single-tenant (Maxibrew only), so URLs no longer carry
+ * a restaurant slug segment — only the `?table=` token, which identifies
+ * which physical table the QR code belongs to.
  *
- *   buildCustomerPath("lifafa", "/menu", "8d3af2e91c")
- *   -> "/lifafa/menu?table=8d3af2e91c"
+ *   buildCustomerPath("/menu", "8d3af2e91c")
+ *   -> "/menu?table=8d3af2e91c"
  */
 export function buildCustomerPath(
-  restaurantSlug: string,
   path: string,
   tableToken?: string | null
 ): string {
-  const normalizedPath = path === "/" || path === "" ? "" : path.startsWith("/") ? path : `/${path}`;
-  const base = `/${restaurantSlug}${normalizedPath}`;
-  return tableToken ? `${base}?table=${encodeURIComponent(tableToken)}` : base;
+  const normalizedPath = path === "/" || path === "" ? "/" : path.startsWith("/") ? path : `/${path}`;
+  return tableToken ? `${normalizedPath}?table=${encodeURIComponent(tableToken)}` : normalizedPath;
 }
 
 /**
- * React hook version — pulls restaurantSlug/tableToken from the session
- * store automatically, so callers never have to pass them manually.
+ * React hook version — pulls tableToken from the session store
+ * automatically, so callers never have to pass it manually.
  *
  * Usage:
  *   const buildCustomerUrl = useBuildCustomerUrl();
  *   router.push(buildCustomerUrl("/cart"));
  */
 export function useBuildCustomerUrl() {
-  const restaurantSlug = useSessionStore((s) => s.restaurantSlug);
   const tableToken = useSessionStore((s) => s.tableToken);
 
   return useCallback(
-    (path: string) => buildCustomerPath(restaurantSlug ?? "", path, tableToken),
-    [restaurantSlug, tableToken]
+    (path: string) => buildCustomerPath(path, tableToken),
+    [tableToken]
   );
 }
 

@@ -2,7 +2,7 @@ const Order = require("../models/Order");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
 
-// GET /api/orders/analytics?restaurantId=lifafa&from=2026-06-01&to=2026-07-01
+// GET /api/orders/analytics?restaurantId=maxibrew&from=2026-06-01&to=2026-07-01
 // `from`/`to` are optional ISO date strings; defaults to the last 30 days.
 // Cancelled orders are excluded from every figure below — they were never
 // fulfilled, so counting their value as revenue would be misleading.
@@ -82,7 +82,7 @@ const getAnalytics = asyncHandler(async (req, res) => {
   });
 });
 
-// GET /api/orders/analytics/peak-hours?restaurantId=lifafa&from=&to=
+// GET /api/orders/analytics/peak-hours?restaurantId=maxibrew&from=&to=
 // Order volume grouped by hour-of-day (0-23), defaulting to the last 30
 // days. Powers the Peak Hours chart on the Analytics page.
 const getPeakHours = asyncHandler(async (req, res) => {

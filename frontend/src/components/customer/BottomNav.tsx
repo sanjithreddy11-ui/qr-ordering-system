@@ -40,11 +40,11 @@ export default function BottomNav() {
           <div className="flex items-stretch justify-around px-1 pb-[env(safe-area-inset-bottom)]">
             {TABS.map((tab) => {
               // Compare against the *unqualified* path segment so this
-              // works regardless of restaurant slug or query string.
+              // works regardless of query string.
               const segment = tab.path === "/" ? "" : tab.path;
               const isActive =
                 segment === ""
-                  ? /^\/[^/]+\/?$/.test(pathname ?? "") // e.g. "/lifafa" or "/lifafa/"
+                  ? pathname === "/" // home is the exact root route now
                   : pathname?.includes(segment);
               const Icon = tab.icon;
 

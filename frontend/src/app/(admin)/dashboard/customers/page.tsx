@@ -12,7 +12,7 @@ import {
   RecentOrder,
 } from "@/lib/admin-api";
 
-const RESTAURANT_ID = "lifafa"; // TODO: make dynamic if you support multiple restaurants
+const RESTAURANT_ID = "maxibrew"; // TODO: make dynamic if you support multiple restaurants
 const bodyFont = "var(--font-body, 'Inter', system-ui, sans-serif)";
 const RANK_MEDALS = ["🥇", "🥈", "🥉"];
 

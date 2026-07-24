@@ -27,7 +27,7 @@ import {
 import CategoriesManager from "@/components/admin/CategoriesManager";
 import { API_BASE_URL } from "@/lib/config";
 
-const RESTAURANT_ID = "lifafa"; // TODO: make dynamic if you support multiple restaurants
+const RESTAURANT_ID = "maxibrew"; // TODO: make dynamic if you support multiple restaurants
 const PAGE_SIZE = 12;
 
 const emptyForm = {

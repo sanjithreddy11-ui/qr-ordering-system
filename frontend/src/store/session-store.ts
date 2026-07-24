@@ -2,33 +2,32 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { SessionInfo } from "@/types/session";
 import { createSession as apiCreateSession, getSessionStatus } from "@/lib/api";
+import { RESTAURANT_ID } from "@/constants/restaurant";
 
 interface SessionStore extends Partial<SessionInfo> {
   /**
-   * Ensures a valid session exists for this restaurant. This is the ONLY
-   * place in the app that should read the `?table=` URL param — it's
-   * called once by the `[restaurantId]` layout when a customer first
-   * lands on the site. Every other page reads restaurantSlug/tableToken
-   * from this store, never from useSearchParams() directly.
+   * Ensures a valid session exists for this (single-tenant) restaurant.
+   * This is the ONLY place in the app that should read the `?table=` URL
+   * param — it's called once by the customer layout when a customer first
+   * lands on the site. Every other page reads tableToken from this store,
+   * never from useSearchParams() directly.
    *
    * Behavior:
-   * - If we already have a valid (non-expired) session for this exact
-   *   restaurant, reuse it — the URL's table param is ignored, because
-   *   we've already "read it once" earlier in this visit.
-   * - Otherwise (first visit, expired session, or a different
-   *   restaurant), the URL's table token becomes the new session's table.
+   * - If we already have a valid (non-expired) session, reuse it — the
+   *   URL's table param is ignored, because we've already "read it once"
+   *   earlier in this visit.
+   * - Otherwise (first visit or expired session), the URL's table token
+   *   becomes the new session's table.
    */
-  ensureSession: (restaurantSlug: string, tableTokenFromUrl?: string | null) => Promise<SessionInfo>;
+  ensureSession: (tableTokenFromUrl?: string | null) => Promise<SessionInfo>;
   clearSession: () => void;
 }
 
 function isLocallyValid(
   state: Partial<SessionInfo>,
-  restaurantSlug: string,
   tableTokenFromUrl?: string | null
 ) {
   if (!state.sessionId || !state.expiresAt || !state.tableToken) return false;
-  if (state.restaurantSlug !== restaurantSlug) return false;
 
   // A different table token in the URL means a *different QR code* was
   // scanned (e.g. same device, different table). That must never reuse
@@ -50,10 +49,10 @@ export const useSessionStore = create<SessionStore>()(
       tableToken: undefined,
       expiresAt: undefined,
 
-      ensureSession: async (restaurantSlug, tableTokenFromUrl) => {
+      ensureSession: async (tableTokenFromUrl) => {
         const state = get();
 
-        if (isLocallyValid(state, restaurantSlug, tableTokenFromUrl)) {
+        if (isLocallyValid(state, tableTokenFromUrl)) {
           // Double-check with the backend in case it was invalidated
           // server-side — but don't block the UI on this round trip.
           getSessionStatus(state.sessionId!).then((status) => {
@@ -71,15 +70,15 @@ export const useSessionStore = create<SessionStore>()(
         }
 
         // Fallback: URL param is only trusted when the store didn't
-        // already have a valid session for this restaurant.
+        // already have a valid session.
         const tableToken = tableTokenFromUrl || state.tableToken || "";
 
-        const created = await apiCreateSession({ restaurantId: restaurantSlug, tableToken });
+        const created = await apiCreateSession({ restaurantId: RESTAURANT_ID, tableToken });
 
         const fresh: SessionInfo = {
           sessionId: created.sessionId,
           restaurantId: created.restaurantId,
-          restaurantSlug, // same value as restaurantId today; kept separate for future use
+          restaurantSlug: RESTAURANT_ID, // kept for backward-compat with SessionInfo shape
           tableToken: created.tableToken,
           expiresAt: created.expiresAt,
         };
