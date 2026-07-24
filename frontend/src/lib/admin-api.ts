@@ -252,6 +252,9 @@ export type TableStatus =
   | "cleaning"
   | "out_of_service";
 
+export type PaymentMethod = "upi" | "cash" | "card";
+export type PaymentStatus = "pending" | "paid";
+
 export interface TableSessionData {
   sessionId: string;
   restaurantId: string;
@@ -265,6 +268,41 @@ export interface TableSessionData {
   sessionEnd: string | null;
   currentBill: number;
   status: "active" | "closed";
+  paymentMethod: PaymentMethod | null;
+  paymentStatus: PaymentStatus;
+  transactionId: string | null;
+  paidAt: string | null;
+  billPrinted: boolean;
+  invoiceNumber: string | null;
+}
+
+export interface ReceiptData {
+  restaurant: { name: string; address: string; phone: string; logo: string; gstNumber: string } | null;
+  table: { label: string };
+  session: {
+    sessionId: string;
+    invoiceNumber: string | null;
+    sessionStart: string;
+    customerName: string;
+    phoneNumber: string;
+    paymentMethod: PaymentMethod | null;
+    paymentStatus: PaymentStatus;
+    transactionId: string | null;
+    paidAt: string | null;
+  };
+  cashierName: string;
+  orders: {
+    orderId: string;
+    placedAt: string;
+    items: { name: string; price: number; quantity: number }[];
+    subtotal: number;
+    taxAmount: number;
+    totalAmount: number;
+  }[];
+  subtotal: number;
+  gst: number;
+  grandTotal: number;
+  generatedAt: string;
 }
 
 export type ReservationStatus =
@@ -357,6 +395,46 @@ export async function fetchSessionOrders(
   sessionId: string
 ): Promise<{ session: TableSessionData; orders: RecentOrder[] }> {
   const res = await authFetch(`/api/admin/table-sessions/${sessionId}/orders`);
+  return handle(res);
+}
+
+// ---------- Current Dining Session: payment workflow ----------
+
+export async function setSessionPaymentMethod(
+  tableId: string,
+  paymentMethod: PaymentMethod
+): Promise<{ session: TableSessionData }> {
+  const res = await authFetch(`/api/admin/tables/${tableId}/session/payment-method`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ paymentMethod }),
+  });
+  return handle(res);
+}
+
+// Cash-only: marks the pre-payment bill as printed and returns the receipt
+// payload to hand to the browser print dialog.
+export async function printSessionBill(
+  tableId: string
+): Promise<{ session: TableSessionData; receipt: ReceiptData }> {
+  const res = await authFetch(`/api/admin/tables/${tableId}/session/print-bill`, { method: "PATCH" });
+  return handle(res);
+}
+
+export async function fetchSessionReceipt(tableId: string): Promise<{ receipt: ReceiptData }> {
+  const res = await authFetch(`/api/admin/tables/${tableId}/session/receipt`);
+  return handle(res);
+}
+
+export async function collectSessionPayment(
+  tableId: string,
+  transactionId?: string
+): Promise<{ session: TableSessionData; table: AdminTable; receipt: ReceiptData }> {
+  const res = await authFetch(`/api/admin/tables/${tableId}/session/collect-payment`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(transactionId ? { transactionId } : {}),
+  });
   return handle(res);
 }
 
@@ -503,6 +581,7 @@ export interface RestaurantProfile {
   description: string;
   address: string;
   phone: string;
+  gstNumber?: string;
   theme: { primaryColor: string; secondaryColor: string };
 }
 

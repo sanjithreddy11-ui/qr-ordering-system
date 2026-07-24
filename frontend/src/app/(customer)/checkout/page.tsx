@@ -43,18 +43,22 @@ export default function CheckoutPage() {
 
   const setOrder = useOrderStore((s) => s.setOrder);
 
+  const name = form.customerName.trim();
+  const phone = form.customerPhone.trim();
+  // No OTP/SMS verification — just require a name and a real-looking phone
+  // number before Place Order is enabled.
+  const canPlaceOrder = Boolean(name) && /^\d{7,15}$/.test(phone);
+
   const handlePlaceOrder = async () => {
     if (!sessionId) {
       setError("Your session couldn't be found. Please go back to the menu and try again.");
       return;
     }
-    const name = form.customerName.trim();
-    const phone = form.customerPhone.trim();
-    if ((name && !phone) || (phone && !name)) {
-      setError("Please enter both your name and phone number, or leave both blank.");
+    if (!name) {
+      setError("Please enter your name.");
       return;
     }
-    if (phone && !/^\d{7,15}$/.test(phone)) {
+    if (!/^\d{7,15}$/.test(phone)) {
       setError("Please enter a valid phone number.");
       return;
     }
@@ -70,8 +74,8 @@ export default function CheckoutPage() {
       orderType: form.orderType,
       specialInstructions: form.specialInstructions,
       paymentMethod: form.paymentMethod,
-      customerName: name || undefined,
-      customerPhone: phone || undefined,
+      customerName: name,
+      customerPhone: phone,
     };
 
     // Cash stays "pay at counter" — unchanged, creates the order right away.
@@ -361,9 +365,9 @@ export default function CheckoutPage() {
             totalAmount={total}
           />
 
-          {/* Your Details — used for order updates and our Top Customers program; optional */}
+          {/* Your Details — required to place an order (no OTP verification) */}
           <div style={glassCardStyle}>
-            <p style={labelStyle}>Your Details (optional)</p>
+            <p style={labelStyle}>Your Details</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <input
                 type="text"
@@ -507,14 +511,15 @@ export default function CheckoutPage() {
         }}
       >
         <motion.button
-          whileTap={{ scale: placing ? 1 : 0.97 }}
+          whileTap={{ scale: placing || !canPlaceOrder ? 1 : 0.97 }}
           onClick={handlePlaceOrder}
-          disabled={placing}
+          disabled={placing || !canPlaceOrder}
           style={{
             width: "100%",
-            background: placing
-              ? "linear-gradient(135deg, #55665A 0%, #3A473C 100%)"
-              : "linear-gradient(135deg, #3A4C3B 0%, #263429 100%)",
+            background:
+              placing || !canPlaceOrder
+                ? "linear-gradient(135deg, #97A399 0%, #7C8A7E 100%)"
+                : "linear-gradient(135deg, #3A4C3B 0%, #263429 100%)",
             color: "#FFFFFF",
             border: "none",
             borderRadius: 999,
@@ -523,7 +528,7 @@ export default function CheckoutPage() {
             fontWeight: 700,
             letterSpacing: "0.3px",
             fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
-            cursor: placing ? "not-allowed" : "pointer",
+            cursor: placing || !canPlaceOrder ? "not-allowed" : "pointer",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -532,7 +537,9 @@ export default function CheckoutPage() {
           }}
         >
           <span style={{ fontSize: 13, opacity: 0.8 }}>₹ {total}</span>
-          <span>{placing ? "Placing Order…" : "Place Order →"}</span>
+          <span>
+            {placing ? "Placing Order…" : !canPlaceOrder ? "Enter Details to Continue" : "Place Order →"}
+          </span>
           <span style={{ width: 48 }} />
         </motion.button>
       </div>

@@ -32,6 +32,25 @@ const tableSessionSchema = new mongoose.Schema(
     currentBill: { type: Number, default: 0 },
 
     status: { type: String, enum: ["active", "closed"], default: "active", index: true },
+
+    // --- Payment workflow (set from the Current Dining Session page) ---
+    // Chosen by the cashier once the customer is ready to pay. Null until
+    // then — collect-payment refuses to run without one.
+    paymentMethod: { type: String, enum: ["upi", "cash", "card", null], default: null },
+    paymentStatus: { type: String, enum: ["pending", "paid"], default: "pending", index: true },
+    // UPI: the UPI transaction/reference id, entered by the cashier once the
+    // customer shows a successful payment. Card: optional (terminal ref).
+    transactionId: { type: String, default: null },
+    paidAt: { type: Date, default: null },
+    // Cash-only gate: the cashier must print the customer's bill BEFORE
+    // collecting cash (so the customer can verify the amount). Collect
+    // Payment is refused for cash sessions until this is true. Reset to
+    // false any time the payment method is changed, so switching methods
+    // can't be used to skip this step.
+    billPrinted: { type: Boolean, default: false },
+    // Generated once (on first Print Bill, or at Collect Payment for
+    // upi/card) and kept stable for any re-print of the same session's bill.
+    invoiceNumber: { type: String, default: null },
   },
   { timestamps: true }
 );

@@ -14,6 +14,12 @@ const {
   markOutOfService,
   getTableAnalytics,
 } = require("../controllers/tableStatusController");
+const {
+  setPaymentMethod,
+  printBill,
+  getReceipt,
+  collectPayment,
+} = require("../controllers/sessionPaymentController");
 
 const router = express.Router();
 
@@ -27,6 +33,12 @@ router.patch("/:tableId/billing", markBilling);
 router.patch("/:tableId/close-session", closeSession);
 router.patch("/:tableId/available", markAvailable);
 router.patch("/:tableId/out-of-service", markOutOfService);
+
+// --- Current Dining Session payment workflow ---
+router.patch("/:tableId/session/payment-method", setPaymentMethod);
+router.patch("/:tableId/session/print-bill", printBill);
+router.get("/:tableId/session/receipt", getReceipt);
+router.patch("/:tableId/session/collect-payment", collectPayment);
 
 // --- Existing QR/table CRUD (unchanged) ---
 router.get("/:restaurantId", listTables);

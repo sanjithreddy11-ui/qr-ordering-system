@@ -8,6 +8,9 @@ const restaurantSchema = new mongoose.Schema(
     description: { type: String, default: "" },
     address: { type: String, default: "" },
     phone: { type: String, default: "" },
+    // Optional — shown on printed bills/receipts when set. Left blank by
+    // default since not every deployment has GST registration yet.
+    gstNumber: { type: String, default: "" },
     theme: {
       primaryColor: { type: String, default: "#3A4C3B" },
       secondaryColor: { type: String, default: "#263429" },

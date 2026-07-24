@@ -15,15 +15,16 @@ const getRestaurant = asyncHandler(async (req, res) => {
       description: restaurant.description,
       address: restaurant.address,
       phone: restaurant.phone,
+      gstNumber: restaurant.gstNumber,
       theme: restaurant.theme,
     },
   });
 });
 
 // PATCH /api/restaurants/:restaurantId
-// Body: any subset of { name, logo, description, address, phone, theme }
+// Body: any subset of { name, logo, description, address, phone, gstNumber, theme }
 const updateRestaurant = asyncHandler(async (req, res) => {
-  const allowedFields = ["name", "logo", "description", "address", "phone", "theme"];
+  const allowedFields = ["name", "logo", "description", "address", "phone", "gstNumber", "theme"];
   const updates = {};
   for (const field of allowedFields) {
     if (field in req.body) updates[field] = req.body[field];
@@ -45,6 +46,7 @@ const updateRestaurant = asyncHandler(async (req, res) => {
       description: restaurant.description,
       address: restaurant.address,
       phone: restaurant.phone,
+      gstNumber: restaurant.gstNumber,
       theme: restaurant.theme,
     },
   });

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Users, ClipboardList, Trash2 } from "lucide-react";
-import { adminColors, Badge, Modal } from "@/components/admin/ui";
+import { adminColors, Modal } from "@/components/admin/ui";
 import { deleteAdminTable, type TableGridItem } from "@/lib/admin-api";
 import { statusMeta, formatCurrency, formatDuration, TABLE_BUTTON_COLORS } from "./tableStatus";
 
@@ -57,14 +57,26 @@ export default function TableCard({
           textAlign: "left",
           background: "#FFFFFF",
           border: `1px solid ${adminColors.border}`,
-          borderRadius: 12,
-          padding: 16,
+          borderTop: `3px solid ${meta.color}`,
+          borderRadius: 14,
+          padding: 14,
           cursor: "pointer",
           display: "flex",
           flexDirection: "column",
-          gap: 10,
+          gap: 8,
+          aspectRatio: "1 / 1",
+          overflow: "hidden",
           boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
           opacity: table.isActive === false ? 0.5 : 1,
+          transition: "transform 120ms ease, box-shadow 120ms ease",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = "translateY(-2px)";
+          e.currentTarget.style.boxShadow = "0 6px 16px rgba(0,0,0,0.08)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = "translateY(0)";
+          e.currentTarget.style.boxShadow = "0 1px 2px rgba(0,0,0,0.03)";
         }}
       >
         <button
@@ -77,13 +89,13 @@ export default function TableCard({
           }}
           style={{
             position: "absolute",
-            top: 10,
-            right: 10,
+            top: 8,
+            right: 8,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            width: 26,
-            height: 26,
+            width: 24,
+            height: 24,
             borderRadius: 8,
             border: "none",
             background: "transparent",
@@ -91,75 +103,87 @@ export default function TableCard({
             cursor: "pointer",
           }}
         >
-          <Trash2 size={14} />
+          <Trash2 size={13} />
         </button>
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingRight: 24 }}>
+        {/* Table Number */}
+        <span
+          style={{
+            fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
+            fontSize: 17,
+            fontWeight: 800,
+            color: adminColors.text,
+            fontVariantNumeric: "tabular-nums",
+            paddingRight: 20,
+          }}
+        >
+          {table.label}
+        </span>
+
+        {/* Status + small indicator */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <StatusDot color={meta.color} />
           <span
             style={{
               fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
-              fontSize: 15,
+              fontSize: 13,
               fontWeight: 700,
-              color: adminColors.text,
-              fontVariantNumeric: "tabular-nums",
+              color: meta.color,
             }}
           >
-            {table.label}
+            {meta.label}
           </span>
         </div>
 
-        <Badge color={meta.color}>
-          <StatusDot color={meta.color} />
-          {meta.label}
-        </Badge>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 4 }}>
+          {(table.status === "occupied" || table.status === "billing") && (
+            <>
+              <BigStat value={formatCurrency(session?.currentBill ?? 0)} />
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <SmallStat icon={<ClipboardList size={12} />}>
+                  {session?.orderIds.length ?? 0} Order{(session?.orderIds.length ?? 0) === 1 ? "" : "s"}
+                </SmallStat>
+                <SmallStat>{formatDuration(table.occupiedAt)}</SmallStat>
+              </div>
+              {session?.customerName && (
+                <div
+                  style={{
+                    fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
+                    fontSize: 11,
+                    color: adminColors.textSecondary,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {session.customerName}
+                </div>
+              )}
+            </>
+          )}
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
-            fontSize: 12,
-            color: adminColors.textSecondary,
-          }}
-        >
-          <Users size={13} /> Seats {table.capacity}
+          {table.status === "reserved" && reservation && (
+            <>
+              <div
+                style={{
+                  fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: adminColors.text,
+                }}
+              >
+                {reservation.customerName}
+              </div>
+              <SmallStat icon={<Users size={12} />}>
+                {reservation.guestCount} · {reservation.reservationTime}
+              </SmallStat>
+            </>
+          )}
+
+          {(table.status === "available" || table.status === "cleaning" || table.status === "out_of_service") && (
+            <SmallStat icon={<Users size={12} />}>Seats {table.capacity}</SmallStat>
+          )}
         </div>
-
-        {table.status === "occupied" || table.status === "billing" ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            {session?.customerName && <Row label="Customer" value={session.customerName} />}
-            <Row
-              label="Occupied since"
-              value={
-                table.occupiedAt
-                  ? new Date(table.occupiedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
-                  : "—"
-              }
-            />
-            <Row label="Duration" value={formatDuration(table.occupiedAt)} />
-            <Row label="Bill" value={formatCurrency(session?.currentBill ?? 0)} />
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                fontSize: 12,
-                color: adminColors.textSecondary,
-                fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
-              }}
-            >
-              <ClipboardList size={13} /> {session?.orderIds.length ?? 0} order
-              {(session?.orderIds.length ?? 0) === 1 ? "" : "s"}
-            </div>
-          </div>
-        ) : table.status === "reserved" && reservation ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <Row label="Customer" value={reservation.customerName} />
-            <Row label="Time" value={`${reservation.reservationDate} · ${reservation.reservationTime}`} />
-            <Row label="Guests" value={String(reservation.guestCount)} />
-          </div>
-        ) : null}
       </div>
 
       {confirmingDelete && (
@@ -249,19 +273,38 @@ function StatusDot({ color }: { color: string }) {
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function BigStat({ value }: { value: string }) {
   return (
-    <div
+    <span
       style={{
-        display: "flex",
-        justifyContent: "space-between",
         fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
-        fontSize: 12,
-        color: adminColors.textSecondary,
+        fontSize: 20,
+        fontWeight: 800,
+        color: adminColors.text,
+        fontVariantNumeric: "tabular-nums",
       }}
     >
-      <span>{label}</span>
-      <span style={{ color: adminColors.text, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{value}</span>
-    </div>
+      {value}
+    </span>
+  );
+}
+
+function SmallStat({ children, icon }: { children: React.ReactNode; icon?: React.ReactNode }) {
+  return (
+    <span
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
+        fontSize: 12,
+        fontWeight: 600,
+        color: adminColors.textSecondary,
+        fontVariantNumeric: "tabular-nums",
+      }}
+    >
+      {icon}
+      {children}
+    </span>
   );
 }

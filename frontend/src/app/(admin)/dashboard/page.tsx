@@ -1,350 +1,316 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import Link from "next/link";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { Search, Plus } from "lucide-react";
+import { PageHeader, adminColors } from "@/components/admin/ui";
+import { getSocket } from "@/lib/socket";
 import {
-  TrendingUp,
-  ShoppingBag,
-  Clock,
-  ChefHat,
-  CheckCircle2,
-  Grid3x3,
-  Plus,
-  QrCode,
-  ChefHat as KitchenIcon,
-  Tag,
-  ArrowRight,
-} from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
-import { PageHeader, Card, Badge, adminColors } from "@/components/admin/ui";
-import {
-  fetchAnalytics,
-  fetchRecentOrders,
-  fetchDashboardSummary,
-  AnalyticsData,
-  RecentOrder,
-  DashboardSummary,
+  fetchTableGrid,
+  fetchTableAnalytics,
+  type TableGridItem,
+  type TableAnalyticsData,
+  type TableStatus,
 } from "@/lib/admin-api";
+import TableCard from "@/components/admin/tables/TableCard";
+import TableDetailsDrawer from "@/components/admin/tables/TableDetailsDrawer";
+import ReservationForm from "@/components/admin/tables/ReservationForm";
+import TableAnalyticsPanel from "@/components/admin/tables/TableAnalyticsPanel";
+import ReservationCalendar from "@/components/admin/tables/ReservationCalendar";
+import QrCodesTab from "@/components/admin/tables/QrCodesTab";
+import { STATUS_FILTERS, STATUS_META } from "@/components/admin/tables/tableStatus";
+import { TablePrimaryButton } from "@/components/admin/tables/tableButtons";
 
 const RESTAURANT_ID = "lifafa"; // TODO: make dynamic if you support multiple restaurants
-const bodyFont = "var(--font-body, 'Inter', system-ui, sans-serif)";
 
-const STATUS_COLOR: Record<string, string> = {
-  pending: adminColors.warning,
-  preparing: adminColors.warning,
-  ready: adminColors.success,
-  completed: adminColors.success,
-  cancelled: adminColors.danger,
-};
+type Tab = "grid" | "reservations" | "qr";
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ fontFamily: bodyFont, fontSize: 14, fontWeight: 700, color: adminColors.text, marginBottom: 14 }}>
-      {children}
-    </div>
-  );
-}
+// Socket events that should trigger a live refresh of the table grid /
+// analytics. Kept as a flat list so adding a new emit on the backend only
+// means adding one string here.
+const LIVE_EVENTS = [
+  "tableOccupied",
+  "tableReserved",
+  "tableAvailable",
+  "tableCleaning",
+  "tableBilling",
+  "tableOutOfService",
+  "reservationCreated",
+  "reservationUpdated",
+  "reservationCancelled",
+  "reservationCheckedIn",
+  "sessionStarted",
+  "sessionEnded",
+  "sessionPaymentUpdated",
+  "new-order",
+  "order-status-updated",
+];
 
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  accent,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  accent?: string;
-}) {
-  const color = accent ?? adminColors.primary;
-  return (
-    <Card style={{ display: "flex", alignItems: "center", gap: 14 }}>
-      <div
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: 12,
-          background: `${color}12`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-        }}
-      >
-        <Icon size={20} color={color} strokeWidth={2} />
-      </div>
-      <div style={{ minWidth: 0 }}>
-        <div
-          style={{
-            fontFamily: bodyFont,
-            fontSize: 11,
-            fontWeight: 700,
-            color: adminColors.textSecondary,
-            textTransform: "uppercase",
-            letterSpacing: "0.04em",
-          }}
-        >
-          {label}
-        </div>
-        <div style={{ fontFamily: bodyFont, fontSize: 22, fontWeight: 800, color: adminColors.text }}>
-          {value}
-        </div>
-      </div>
-    </Card>
-  );
-}
+export default function AdminTablesPage() {
+  const router = useRouter();
+  const [tab, setTab] = useState<Tab>("grid");
 
-function KitchenStatusCard({ label, count, color }: { label: string; count: number; color: string }) {
-  return (
-    <Card style={{ textAlign: "center", padding: "18px 14px" }}>
-      <div style={{ fontFamily: bodyFont, fontSize: 28, fontWeight: 800, color }}>{count}</div>
-      <div
-        style={{
-          fontFamily: bodyFont,
-          fontSize: 12,
-          fontWeight: 700,
-          color: adminColors.textSecondary,
-          textTransform: "uppercase",
-          letterSpacing: "0.04em",
-          marginTop: 2,
-        }}
-      >
-        {label}
-      </div>
-    </Card>
-  );
-}
-
-function QuickAction({
-  icon: Icon,
-  label,
-  href,
-  newTab,
-}: {
-  icon: React.ElementType;
-  label: string;
-  href: string;
-  newTab?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      target={newTab ? "_blank" : undefined}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "14px 16px",
-        borderRadius: 14,
-        border: `1px solid ${adminColors.border}`,
-        background: "#FFFFFF",
-        textDecoration: "none",
-        transition: "border-color 0.15s ease",
-      }}
-    >
-      <div
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: 10,
-          background: `${adminColors.primary}12`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-        }}
-      >
-        <Icon size={17} color={adminColors.primary} strokeWidth={2} />
-      </div>
-      <span style={{ fontFamily: bodyFont, fontSize: 13, fontWeight: 700, color: adminColors.text }}>{label}</span>
-    </Link>
-  );
-}
-
-export default function AdminOverviewPage() {
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [revenueTrend, setRevenueTrend] = useState<AnalyticsData | null>(null);
-  const [liveOrders, setLiveOrders] = useState<RecentOrder[]>([]);
+  const [tables, setTables] = useState<TableGridItem[]>([]);
+  const [analytics, setAnalytics] = useState<TableAnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const toDate = new Date();
-    const fromDate = new Date(toDate.getTime() - 6 * 24 * 60 * 60 * 1000); // last 7 days incl. today
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<TableStatus | "all">("all");
 
-    Promise.all([
-      fetchDashboardSummary(RESTAURANT_ID),
-      fetchAnalytics(RESTAURANT_ID, fromDate.toISOString(), toDate.toISOString()),
-      fetchRecentOrders(RESTAURANT_ID, { status: "pending,preparing,ready", limit: 8 }),
-    ])
-      .then(([s, trend, orders]) => {
-        setSummary(s);
-        setRevenueTrend(trend);
-        setLiveOrders(orders);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+  const [showReservationForm, setShowReservationForm] = useState(false);
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const anyModalOpen = Boolean(selectedTableId) || showReservationForm;
+
+  const load = useCallback(async () => {
+    // Grid comes back numerically sorted by table number from the backend
+    // (Table 1, 2, 3 ... 10 — not "1, 10, 2" string order).
+    const [grid, stats] = await Promise.all([
+      fetchTableGrid(RESTAURANT_ID),
+      fetchTableAnalytics(RESTAURANT_ID).catch(() => null),
+    ]);
+    setTables(grid);
+    if (stats) setAnalytics(stats);
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // Live updates: join the tables room and refetch on any relevant event.
+  // Refetching the whole grid (rather than patching individual tables) is
+  // deliberately simple/robust — table counts here are small enough that a
+  // full refetch per event is cheap and can't drift out of sync.
+  useEffect(() => {
+    const socket = getSocket();
+    socket.emit("join-tables", RESTAURANT_ID);
+
+    const handler = () => load();
+    LIVE_EVENTS.forEach((evt) => socket.on(evt, handler));
+
+    return () => {
+      LIVE_EVENTS.forEach((evt) => socket.off(evt, handler));
+      socket.emit("leave-tables", RESTAURANT_ID);
+    };
+  }, [load]);
+
+  // Defensive fix for the reported "typing in the reservation form also
+  // fills the search bar" bug: even though the search input and the
+  // reservation form fields are already fully separate React state, a
+  // modal that never moves keyboard focus into itself can leave the
+  // browser's focus sitting on the search input underneath, so keystrokes
+  // land there instead. Explicitly blurring (and disabling) the search
+  // input for the duration that any table modal is open makes this
+  // impossible regardless of focus timing.
+  useEffect(() => {
+    if (anyModalOpen) searchInputRef.current?.blur();
+  }, [anyModalOpen]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return tables.filter((t) => {
+      if (statusFilter !== "all" && t.status !== statusFilter) return false;
+      if (!q) return true;
+      const customer = t.activeSession?.customerName || t.activeReservation?.customerName || "";
+      const phone = t.activeSession?.phoneNumber || t.activeReservation?.phoneNumber || "";
+      return (
+        t.label.toLowerCase().includes(q) ||
+        customer.toLowerCase().includes(q) ||
+        phone.toLowerCase().includes(q)
+      );
+    });
+  }, [tables, search, statusFilter]);
+
+  const tableLabelById = useMemo(() => new Map(tables.map((t) => [t._id, t.label])), [tables]);
+  const availableTables = useMemo(() => tables.filter((t) => t.status === "available"), [tables]);
+
+  // Table Click Behaviour: an occupied/billing table has an active dining
+  // session worth its own full page (order history, running bill, payment
+  // workflow). Any other status (available/reserved/cleaning/out of
+  // service) has nothing session-shaped to show, so it keeps using the
+  // lightweight details modal for quick status actions.
+  const handleTableClick = (table: TableGridItem) => {
+    if (table.status === "occupied" || table.status === "billing") {
+      router.push(`/dashboard/tables/session/${table._id}`);
+    } else {
+      setSelectedTableId(table._id);
+    }
+  };
 
   return (
     <div>
-      <PageHeader title="Dashboard" description="What's happening in your restaurant right now" />
+      <PageHeader
+        title="Tables"
+        description="Live table status, dining sessions, and reservations"
+        action={
+          <TablePrimaryButton onClick={() => setShowReservationForm(true)}>
+            <Plus size={15} /> Reserve Table
+          </TablePrimaryButton>
+        }
+      />
 
-      {loading && (
-        <p style={{ fontFamily: bodyFont, fontSize: 13, color: adminColors.textSecondary }}>Loading…</p>
-      )}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        {(
+          [
+            { key: "grid", label: "Table Grid" },
+            { key: "reservations", label: "Reservations" },
+            { key: "qr", label: "QR Codes" },
+          ] as { key: Tab; label: string }[]
+        ).map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 10,
+              border: `1px solid ${tab === t.key ? adminColors.primary : adminColors.border}`,
+              background: tab === t.key ? adminColors.primary : "#FFFFFF",
+              color: tab === t.key ? "#FFFFFF" : adminColors.text,
+              fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      {!loading && (
+      {tab === "grid" && (
         <>
-          {/* ---- KPI cards ---- */}
+          {analytics && <TableAnalyticsPanel analytics={analytics} />}
+
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 18, alignItems: "center" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "8px 12px",
+                borderRadius: 10,
+                border: `1px solid ${adminColors.border}`,
+                background: anyModalOpen ? adminColors.bg : "#FFFFFF",
+                flex: "1 1 240px",
+              }}
+            >
+              <Search size={14} color={adminColors.textSecondary} />
+              <input
+                ref={searchInputRef}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                disabled={anyModalOpen}
+                placeholder="Search table, customer, or phone"
+                style={{
+                  border: "none",
+                  outline: "none",
+                  flex: 1,
+                  background: "transparent",
+                  fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
+                  fontSize: 13,
+                  color: adminColors.text,
+                }}
+              />
+            </div>
+
+            <FilterChip label="All" active={statusFilter === "all"} onClick={() => setStatusFilter("all")} />
+            {STATUS_FILTERS.map((s) => (
+              <FilterChip
+                key={s}
+                label={STATUS_META[s].label}
+                color={STATUS_META[s].color}
+                active={statusFilter === s}
+                onClick={() => setStatusFilter(s)}
+              />
+            ))}
+          </div>
+
+          {loading && (
+            <p style={{ fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)", fontSize: 13, color: adminColors.textSecondary }}>
+              Loading…
+            </p>
+          )}
+
+          {!loading && filtered.length === 0 && (
+            <p style={{ fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)", fontSize: 13, color: adminColors.textSecondary }}>
+              No tables match your search/filter.
+            </p>
+          )}
+
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
               gap: 16,
-              marginBottom: 24,
             }}
           >
-            <StatCard icon={TrendingUp} label="Today's Revenue" value={`₹ ${(summary?.todayRevenue ?? 0).toLocaleString("en-IN")}`} />
-            <StatCard icon={ShoppingBag} label="Today's Orders" value={`${summary?.todayOrders ?? 0}`} />
-            <StatCard icon={Clock} label="Pending Orders" value={`${summary?.pendingOrders ?? 0}`} accent={adminColors.warning} />
-            <StatCard icon={ChefHat} label="Preparing Orders" value={`${summary?.preparingOrders ?? 0}`} accent={adminColors.warning} />
-            <StatCard icon={CheckCircle2} label="Completed Orders" value={`${summary?.completedOrders ?? 0}`} accent={adminColors.success} />
-            <StatCard icon={Grid3x3} label="Active Tables" value={`${summary?.activeTables ?? 0}`} />
+            {filtered.map((table) => (
+              <TableCard
+                key={table._id}
+                table={table}
+                onClick={() => handleTableClick(table)}
+                onDeleted={load}
+              />
+            ))}
           </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 16, marginBottom: 24, alignItems: "start" }}>
-            {/* ---- Revenue chart (last 7 days) ---- */}
-            <Card>
-              <SectionTitle>Revenue — Last 7 Days</SectionTitle>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={revenueTrend?.dailyTotals ?? []}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={adminColors.border} />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fontSize: 10, fontFamily: bodyFont }}
-                    tickFormatter={(d: string) => new Date(d).toLocaleDateString([], { day: "numeric", month: "short" })}
-                  />
-                  <YAxis tick={{ fontSize: 10, fontFamily: bodyFont }} />
-                  <Tooltip
-                    contentStyle={{ fontFamily: bodyFont, fontSize: 12, borderRadius: 8 }}
-                    formatter={(value) => [`₹ ${value}`, "Revenue"]}
-                    labelFormatter={(d) => new Date(String(d)).toLocaleDateString()}
-                  />
-                  <Bar dataKey="revenue" fill={adminColors.primary} radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </Card>
-
-            {/* ---- Kitchen Status ---- */}
-            <Card>
-              <SectionTitle>Kitchen Status</SectionTitle>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-                <KitchenStatusCard label="Pending" count={summary?.pendingOrders ?? 0} color={adminColors.warning} />
-                <KitchenStatusCard label="Preparing" count={summary?.preparingOrders ?? 0} color={adminColors.warning} />
-                <KitchenStatusCard label="Ready" count={summary?.readyOrders ?? 0} color={adminColors.success} />
-              </div>
-            </Card>
-          </div>
-
-          {/* ---- Quick Actions ---- */}
-          <Card style={{ marginBottom: 24 }}>
-            <SectionTitle>Quick Actions</SectionTitle>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-              <QuickAction icon={Plus} label="Add Menu Item" href="/dashboard/menu" />
-              <QuickAction icon={QrCode} label="Generate QR" href="/dashboard/tables" />
-              <QuickAction icon={KitchenIcon} label="View Kitchen" href="/kds" newTab />
-              <QuickAction icon={Tag} label="Create Offer" href="/dashboard/offers" />
-            </div>
-          </Card>
-
-          {/* ---- Live Orders ---- */}
-          <Card>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <div style={{ fontFamily: bodyFont, fontSize: 14, fontWeight: 700, color: adminColors.text }}>
-                Live Orders
-              </div>
-              <Link
-                href="/dashboard/orders"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  fontFamily: bodyFont,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: adminColors.primary,
-                  textDecoration: "none",
-                }}
-              >
-                View All Orders <ArrowRight size={13} />
-              </Link>
-            </div>
-
-            {liveOrders.length === 0 ? (
-              <p style={{ fontFamily: bodyFont, fontSize: 13, color: adminColors.textSecondary }}>
-                No active orders right now.
-              </p>
-            ) : (
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ textAlign: "left" }}>
-                    {["Order", "Table", "Type", "Status", "Amount", "Time"].map((h) => (
-                      <th
-                        key={h}
-                        style={{
-                          fontFamily: bodyFont,
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: adminColors.textSecondary,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.04em",
-                          padding: "8px 10px",
-                          borderBottom: `1px solid ${adminColors.border}`,
-                        }}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {liveOrders.map((o) => (
-                    <tr key={o.orderId}>
-                      <td style={cellStyle}>#{o.orderId}</td>
-                      <td style={cellStyle}>{o.tableLabel ?? "—"}</td>
-                      <td style={cellStyle}>{o.orderType === "dine-in" ? "Dine-in" : "Takeaway"}</td>
-                      <td style={cellStyle}>
-                        <Badge color={STATUS_COLOR[o.status] ?? adminColors.textSecondary}>{o.status}</Badge>
-                      </td>
-                      <td style={cellStyle}>₹ {o.totalAmount}</td>
-                      <td style={cellStyle}>
-                        <Clock size={11} style={{ display: "inline", marginRight: 4 }} />
-                        {new Date(o.placedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </Card>
         </>
+      )}
+
+      {tab === "reservations" && (
+        <ReservationCalendar restaurantId={RESTAURANT_ID} tableLabelById={tableLabelById} onChanged={load} />
+      )}
+
+      {tab === "qr" && <QrCodesTab RESTAURANT_ID={RESTAURANT_ID} />}
+
+      {selectedTableId && (
+        <TableDetailsDrawer tableId={selectedTableId} onClose={() => setSelectedTableId(null)} onChanged={load} />
+      )}
+
+      {showReservationForm && (
+        <ReservationForm
+          restaurantId={RESTAURANT_ID}
+          availableTables={availableTables}
+          onClose={() => setShowReservationForm(false)}
+          onCreated={() => {
+            setShowReservationForm(false);
+            load();
+          }}
+        />
       )}
     </div>
   );
 }
 
-const cellStyle: React.CSSProperties = {
-  fontFamily: bodyFont,
-  fontSize: 13,
-  color: adminColors.text,
-  padding: "10px 10px",
-  borderBottom: `1px solid ${adminColors.border}`,
-};
+function FilterChip({
+  label,
+  active,
+  onClick,
+  color,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  color?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: "6px 12px",
+        borderRadius: 999,
+        border: `1px solid ${active ? color || adminColors.primary : adminColors.border}`,
+        background: active ? `${color || adminColors.primary}1A` : "#FFFFFF",
+        color: active ? color || adminColors.primary : adminColors.textSecondary,
+        fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
+        fontSize: 12,
+        fontWeight: 700,
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {label}
+    </button>
+  );
+}

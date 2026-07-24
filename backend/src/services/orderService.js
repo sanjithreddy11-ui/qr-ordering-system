@@ -82,11 +82,14 @@ async function validateAndBuildOrder(body) {
   if (!sessionId) {
     throw new ApiError(400, "sessionId is required");
   }
-  // Name/phone are optional (guest checkout stays supported), but if either
-  // is provided we require both — a phone number with no name (or vice
-  // versa) isn't useful for Customer analytics and is more likely a typo.
-  if ((customerName && !customerPhone) || (customerPhone && !customerName)) {
-    throw new ApiError(400, "Provide both name and phone, or leave both blank");
+  // Name and phone are now required for every order — no OTP/SMS
+  // verification, just presence + a basic format check, so a customer must
+  // at least type in a real-looking number before they can place an order.
+  if (!customerName || !customerPhone) {
+    throw new ApiError(400, "Name and phone number are required to place an order");
+  }
+  if (!/^\d{7,15}$/.test(String(customerPhone).trim())) {
+    throw new ApiError(400, "Please enter a valid phone number");
   }
   if (!clientRestaurantId || !tableToken || !Array.isArray(items) || items.length === 0) {
     throw new ApiError(400, "restaurantId, tableToken and at least one item are required");

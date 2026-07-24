@@ -277,6 +277,9 @@ const emitReservationCheckedIn = (r) => emitTableEvent(r.restaurantId, "reservat
 
 const emitSessionStarted = (s) => emitTableEvent(s.restaurantId, "sessionStarted", s);
 const emitSessionEnded = (s) => emitTableEvent(s.restaurantId, "sessionEnded", s);
+// Payment method chosen, bill printed, or payment collected on a session —
+// the Tables grid and the Current Dining Session page both listen for this.
+const emitSessionPaymentUpdated = (s) => emitTableEvent(s.restaurantId, "sessionPaymentUpdated", s);
 
 module.exports = {
   initSocket,
@@ -295,4 +298,5 @@ module.exports = {
   emitReservationCheckedIn,
   emitSessionStarted,
   emitSessionEnded,
+  emitSessionPaymentUpdated,
 };

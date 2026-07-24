@@ -2,7 +2,17 @@
 // add/remove/relabel tables — nothing else in the backend should hardcode
 // table tokens. Re-run `npm run seed` after changing this.
 
-const DEMO_RESTAURANT_ID = "MAXIBREW";
+// Must match the restaurantId used everywhere else in this app (see
+// backend/src/seed/menuData.js, Restaurant.restaurantId, Staff.restaurantId).
+// This previously said "MAXIBREW", a different id than the rest of the app
+// ("lifafa") — so all 10 seeded demo tables were invisible to every
+// restaurantId-scoped query (the Tables grid, table-session lookups, etc.).
+// The dashboard only ever showed the one table created manually through the
+// "+ Add Table" flow (which correctly used "lifafa"). Fixed by aligning this
+// with the app-wide restaurantId; re-run `npm run seed` to correct the
+// already-seeded documents (matched/updated by their fixed `token`, so this
+// is a safe re-run, not a duplicate insert).
+const DEMO_RESTAURANT_ID = "lifafa";
 
 // Fixed, unguessable per-table tokens (not sequential IDs like "tbl_1").
 // These stay constant for the demo so printed QR codes keep working.
