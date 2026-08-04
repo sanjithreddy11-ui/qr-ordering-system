@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+  <filter id="washi" x="0" y="0" width="100%" height="100%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.012 0.018" numOctaves="4" seed="7" result="noise" stitchTiles="stitch"/>
+    <feColorMatrix in="noise" type="matrix"
+      values="0 0 0 0 0.13
+              0 0 0 0 0.15
+              0 0 0 0 0.11
+              0 0 0 1.1 0" result="fine"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.003 0.05" numOctaves="2" seed="21" result="fiber" stitchTiles="stitch"/>
+    <feColorMatrix in="fiber" type="matrix"
+      values="0 0 0 0 0.2
+              0 0 0 0 0.18
+              0 0 0 0 0.12
+              0 0 0 0.55 0" result="fiberColored"/>
+    <feMerge>
+      <feMergeNode in="fine"/>
+      <feMergeNode in="fiberColored"/>
+    </feMerge>
+  </filter>
+  <rect width="600" height="600" filter="url(#washi)"/>
+</svg>

@@ -1,0 +1,20 @@
+import { io, Socket } from "socket.io-client";
+import { API_BASE_URL } from "@/lib/config";
+
+let socket: Socket | null = null;
+
+// One shared connection for the whole app (kitchen dashboard AND
+// order-success page can both use this without opening duplicate sockets).
+export function getSocket(): Socket {
+  if (!socket) {
+    socket = io(API_BASE_URL, {
+      // Starts on HTTP long-polling and upgrades to a real WebSocket once
+      // the handshake succeeds — this is Socket.io's own default and is
+      // more reliable behind hosted proxies (e.g. Render) than forcing
+      // "websocket" only, especially right after a free-tier cold start.
+      transports: ["polling", "websocket"],
+      autoConnect: true,
+    });
+  }
+  return socket;
+}

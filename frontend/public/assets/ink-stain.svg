@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240" fill="none">
+  <defs>
+    <filter id="stainEdge" x="-30%" y="-30%" width="160%" height="160%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.018 0.022" numOctaves="4" seed="4" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="30" xChannelSelector="R" yChannelSelector="G"/>
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+  </defs>
+  <path d="M100 60 C 150 40, 210 55, 230 95 C 250 130, 230 165, 190 175 C 150 185, 100 175, 80 145 C 60 115, 65 78, 100 60 Z"
+    fill="#B7AE98" opacity="0.4" filter="url(#stainEdge)"/>
+  <path d="M170 110 C 195 100, 220 112, 222 135 C 224 155, 200 168, 178 160 C 160 154, 155 130, 170 110 Z"
+    fill="#8F8873" opacity="0.28" filter="url(#stainEdge)"/>
+</svg>

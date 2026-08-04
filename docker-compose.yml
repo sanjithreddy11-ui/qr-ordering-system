@@ -1,0 +1,27 @@
+version: "3.8"
+
+# Local MongoDB for development. This removes the network round trip to a
+# remote cluster (e.g. Atlas M0 free tier) that every single query pays —
+# with a local database, queries run at local-disk speed instead of
+# depending on your internet connection and the cluster's region.
+#
+# Usage:
+#   docker compose up -d
+#
+# Then point backend/.env at it:
+#   MONGODB_URI=mongodb://localhost:27017/qr-ordering-system
+#
+# Keep your Atlas URI for actual production deployment — this is for local
+# dev only.
+services:
+  mongo:
+    image: mongo:7
+    container_name: qr-ordering-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - qr-ordering-mongo-data:/data/db
+
+volumes:
+  qr-ordering-mongo-data:

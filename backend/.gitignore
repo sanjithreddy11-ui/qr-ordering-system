@@ -1,0 +1,18 @@
+# dependencies
+/node_modules
+
+# env files — contains live secrets (Mongo URI, JWT_SECRET). Never commit.
+.env
+.env.*
+!.env.example
+
+# uploaded admin images (local dev storage)
+/public/uploads/*
+!/public/uploads/.gitkeep
+
+# QZ Tray signing cert/key generated for local dev — never commit these.
+# In production, set QZ_CERTIFICATE / QZ_PRIVATE_KEY env vars instead.
+
+# misc
+.DS_Store
+npm-debug.log*
