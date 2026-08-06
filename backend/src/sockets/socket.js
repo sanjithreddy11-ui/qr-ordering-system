@@ -297,6 +297,13 @@ const emitSessionEnded = (s) => emitTableEvent(s.restaurantId, "sessionEnded", s
 // Payment method chosen, bill printed, or payment collected on a session —
 // the Tables grid and the Current Dining Session page both listen for this.
 const emitSessionPaymentUpdated = (s) => emitTableEvent(s.restaurantId, "sessionPaymentUpdated", s);
+// Table Shifting (Transfer Table): the same TableSession just moved to a
+// different table (see tableStatusController.js:transferTable). Fired
+// alongside emitTableAvailable(oldTable)/emitTableOccupied(newTable) —
+// those two already drive the Tables grid refresh, this one is purely so
+// anything watching the session itself (e.g. a Current Dining Session page
+// left open on the old table) knows to re-check where it lives now.
+const emitSessionTransferred = (s) => emitTableEvent(s.restaurantId, "sessionTransferred", s);
 
 // --- Settlements Module ---
 // A new Pending Settlement appeared (Submit Bill) — Settlements page and
@@ -326,6 +333,7 @@ module.exports = {
   emitSessionStarted,
   emitSessionEnded,
   emitSessionPaymentUpdated,
+  emitSessionTransferred,
   emitSettlementCreated,
   emitSettlementUpdated,
 };

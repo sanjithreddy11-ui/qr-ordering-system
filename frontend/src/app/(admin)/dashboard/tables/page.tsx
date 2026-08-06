@@ -40,6 +40,7 @@ const LIVE_EVENTS = [
   "reservationCheckedIn",
   "sessionStarted",
   "sessionEnded",
+  "sessionTransferred",
   "new-order",
   "order-status-updated",
 ];
@@ -251,7 +252,12 @@ export default function AdminTablesPage() {
       {tab === "qr" && <QrCodesTab RESTAURANT_ID={RESTAURANT_ID} />}
 
       {selectedTableId && (
-        <TableDetailsDrawer tableId={selectedTableId} onClose={() => setSelectedTableId(null)} onChanged={load} />
+        <TableDetailsDrawer
+          tableId={selectedTableId}
+          tables={tables}
+          onClose={() => setSelectedTableId(null)}
+          onChanged={load}
+        />
       )}
 
       {showReservationForm && (

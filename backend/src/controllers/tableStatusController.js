@@ -8,8 +8,10 @@ const {
   emitTableBilling,
   emitTableCleaning,
   emitTableAvailable,
+  emitTableOccupied,
   emitTableOutOfService,
   emitSessionEnded,
+  emitSessionTransferred,
 } = require("../sockets/socket");
 
 // Tables created before the status-lifecycle fields were added to the
@@ -126,6 +128,118 @@ const closeSession = asyncHandler(async (req, res) => {
   res.json({ table, closedSession: session });
 });
 
+// PATCH /api/admin/tables/:tableId/transfer
+// Body: { destinationTableId }
+// Table Shifting (Transfer Table): moves the source table's active dining
+// session onto a different table. The customer owns the dining session,
+// not the table — so this reassigns exactly one thing, the TableSession's
+// `tableId`/`tableToken`, and nothing else. No new session is created, no
+// bill is created, and no Order documents are touched or duplicated: every
+// order still belongs to the same `session.orderIds`, so it keeps showing
+// up under the (now-moved) session wherever that's read from — the Tables
+// grid, the Current Dining Session page, Print/Reprint KOT, Print Bill,
+// Settlements, everything. See models/TableSession.js and
+// services/orderService.js:syncTableOccupancyForOrder, which resolves the
+// active session for any future order via `table.currentSessionId` — since
+// that pointer is what actually moves here, any order placed at either
+// table afterwards (customer QR scan or admin Create Order) attaches to
+// the correct place automatically.
+const transferTable = asyncHandler(async (req, res) => {
+  const { destinationTableId } = req.body;
+  if (!destinationTableId) throw new ApiError(400, "destinationTableId is required");
+  if (destinationTableId === req.params.tableId) {
+    throw new ApiError(400, "Choose a different table to transfer to");
+  }
+
+  const [sourceTable, destinationTable] = await Promise.all([
+    Table.findById(req.params.tableId),
+    Table.findById(destinationTableId),
+  ]);
+  if (!sourceTable) throw new ApiError(404, "Table not found");
+  if (!destinationTable) throw new ApiError(404, "Destination table not found");
+
+  const session = sourceTable.currentSessionId
+    ? await TableSession.findOne({ sessionId: sourceTable.currentSessionId, status: "active" })
+    : null;
+  if (!session) throw new ApiError(400, "This table has no active dining session to transfer");
+
+  // Validation Rules (Step 11): only a table that's genuinely free can
+  // receive a transfer — mirrors exactly what the "Move To" dropdown on
+  // the frontend is allowed to list (see TransferTableModal.tsx).
+  // "Reserved" is the one exception: allowed only while that reservation
+  // hasn't started yet, so an early walk-in transfer can't silently step
+  // on a booking that's already due.
+  if (destinationTable.status === "reserved") {
+    const reservation = destinationTable.currentReservationId
+      ? await Reservation.findOne({ reservationId: destinationTable.currentReservationId })
+      : null;
+    const startsAt = reservation ? new Date(`${reservation.reservationDate}T${reservation.reservationTime}`) : null;
+    if (!reservation || !startsAt || startsAt.getTime() <= Date.now()) {
+      throw new ApiError(400, `Table ${destinationTable.label} is reserved and cannot receive a transfer`);
+    }
+    // Reservation hasn't started — leave it exactly as-is on the
+    // destination table; only today's dining session moves in early.
+  } else if (destinationTable.status !== "available") {
+    const REASON = {
+      occupied: "is currently occupied",
+      billing: "is currently occupied",
+      awaiting_payment: "is currently occupied",
+      cleaning: "is being cleaned",
+      out_of_service: "is out of service",
+    };
+    throw new ApiError(
+      400,
+      `Table ${destinationTable.label} ${REASON[destinationTable.status] || "is not available"} and cannot receive a transfer`
+    );
+  }
+
+  // Defensive: the DB-level unique partial index on {tableId, status:
+  // "active"} (models/TableSession.js) already guarantees only one active
+  // session per table, but checking up front turns a would-be duplicate-key
+  // exception mid-write into a clean, user-facing error instead.
+  const destinationHasActiveSession = await TableSession.exists({
+    tableId: destinationTable._id,
+    status: "active",
+  });
+  if (destinationHasActiveSession) {
+    throw new ApiError(400, `Table ${destinationTable.label} already has an active dining session`);
+  }
+
+  // --- The transfer itself ---
+  // Reuse the existing TableSession — same sessionId, same orderIds, same
+  // billing/discount/GST/payment/KOT fields, same sessionStart (so the
+  // session timer keeps counting from when the customer first sat down,
+  // not from the transfer). Only the table reference changes.
+  session.tableId = destinationTable._id;
+  session.tableToken = destinationTable.token;
+  await session.save();
+
+  destinationTable.status = "occupied";
+  destinationTable.currentSessionId = session.sessionId;
+  // Carries the ORIGINAL occupied-at time so "Session Duration" / the
+  // dashboard's elapsed-time display keeps ticking from when the visit
+  // started, not from the moment of transfer.
+  destinationTable.occupiedAt = sourceTable.occupiedAt || session.sessionStart;
+  await destinationTable.save();
+
+  sourceTable.status = "available";
+  sourceTable.currentSessionId = null;
+  sourceTable.currentReservationId = null;
+  sourceTable.occupiedAt = null;
+  await sourceTable.save();
+
+  emitTableAvailable(sourceTable);
+  emitTableOccupied(destinationTable);
+  emitSessionTransferred(session);
+
+  res.json({
+    session,
+    sourceTable,
+    destinationTable,
+    message: `Dining session successfully transferred to ${destinationTable.label}.`,
+  });
+});
+
 // PATCH /api/admin/tables/:tableId/available
 // Used both for "Mark Available" after cleaning and to clear a table
 // manually (e.g. from Out of Service).
@@ -227,6 +341,7 @@ module.exports = {
   getTableDetails,
   markBilling,
   closeSession,
+  transferTable,
   markAvailable,
   markOutOfService,
   getTableAnalytics,

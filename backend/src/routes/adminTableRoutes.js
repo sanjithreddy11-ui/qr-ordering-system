@@ -10,6 +10,7 @@ const {
   getTableDetails,
   markBilling,
   closeSession,
+  transferTable,
   markAvailable,
   markOutOfService,
   getTableAnalytics,
@@ -34,6 +35,10 @@ router.get("/:restaurantId/analytics", getTableAnalytics);
 router.get("/:tableId/details", getTableDetails);
 router.patch("/:tableId/billing", markBilling);
 router.patch("/:tableId/close-session", closeSession);
+// Table Shifting (Transfer Table): Body: { destinationTableId }. Moves the
+// active dining session to another table without creating a new session,
+// bill, or duplicating any orders — see controllers/tableStatusController.js.
+router.patch("/:tableId/transfer", transferTable);
 router.patch("/:tableId/available", markAvailable);
 router.patch("/:tableId/out-of-service", markOutOfService);
 

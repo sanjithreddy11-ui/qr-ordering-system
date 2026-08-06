@@ -439,6 +439,23 @@ export async function closeTableSession(tableId: string): Promise<AdminTable> {
   return data.table;
 }
 
+// Table Shifting (Transfer Table): moves the source table's active dining
+// session onto `destinationTableId` — same session, same orders, same
+// bill, just a different table. Returns the updated source (now
+// Available), the updated destination (now Occupied), and the session
+// itself (its tableId/tableToken now point at the destination).
+export async function transferTableSession(
+  sourceTableId: string,
+  destinationTableId: string
+): Promise<{ session: TableSessionData; sourceTable: AdminTable; destinationTable: AdminTable; message: string }> {
+  const res = await authFetch(`/api/admin/tables/${sourceTableId}/transfer`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ destinationTableId }),
+  });
+  return handle(res);
+}
+
 export async function markTableAvailable(tableId: string): Promise<AdminTable> {
   const res = await authFetch(`/api/admin/tables/${tableId}/available`, { method: "PATCH" });
   const data = await handle<{ table: AdminTable }>(res);

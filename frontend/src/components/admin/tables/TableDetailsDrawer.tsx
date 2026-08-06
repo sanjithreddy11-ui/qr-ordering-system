@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Printer, Receipt, Check, Plus } from "lucide-react";
+import { Printer, Receipt, Check, Plus, ArrowLeftRight } from "lucide-react";
 import { Modal, SecondaryButton, PrimaryButton, Select, Badge, adminColors } from "@/components/admin/ui";
 import {
   fetchTableDetails,
@@ -28,6 +28,7 @@ import { TablePrimaryButton } from "./tableButtons";
 import ModalHeader from "./ModalHeader";
 import ThermalReceipt from "./ThermalReceipt";
 import TableCreateOrderScreen from "./TableCreateOrderScreen";
+import TransferTableModal from "./TransferTableModal";
 import { usePrinterStore, PrinterError, type KotPrintResult } from "@/store/printer-store";
 import type { KOTOrder } from "@/lib/printer/kot";
 import { getGstBreakdown, getGstRateLabel } from "@/lib/billing";
@@ -102,10 +103,13 @@ function orderStatusLabel(status: string | null): string {
 
 export default function TableDetailsDrawer({
   tableId,
+  tables,
   onClose,
   onChanged,
 }: {
   tableId: string;
+  /** Full table grid — used to compute eligible destinations for Shift Table. */
+  tables: TableGridItem[];
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -120,6 +124,10 @@ export default function TableDetailsDrawer({
   // Opened directly from this table's header, next to Print KOT, since the
   // table (and its active session, if any) is already known here.
   const [showCreateOrder, setShowCreateOrder] = useState(false);
+
+  // Table Shifting (Transfer Table): opened from the header, next to Print
+  // KOT / Create Order, for any occupied table.
+  const [showTransferTable, setShowTransferTable] = useState(false);
 
   // Print workflow state — separate from `busy`/`error` above so a print
   // failure never blocks the other billing actions (Close Session, Mark
@@ -442,6 +450,35 @@ export default function TableDetailsDrawer({
                 </button>
               )}
 
+              {/* Table Shifting (Transfer Table): only for an occupied
+                  table with a live session — moving the same session onto
+                  a different table. */}
+              {session && table.status === "occupied" && (
+                <button
+                  type="button"
+                  onClick={() => setShowTransferTable(true)}
+                  title={`Move this dining session to another table`}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "6px 12px",
+                    borderRadius: 8,
+                    border: `1px solid ${adminColors.border}`,
+                    background: "#FFFFFF",
+                    color: adminColors.text,
+                    fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <ArrowLeftRight size={13} />
+                  Shift Table
+                </button>
+              )}
+
               {canCreateOrder && (
                 <button
                   type="button"
@@ -698,6 +735,23 @@ export default function TableDetailsDrawer({
             // stays exactly as it was, just with the new order attached.
             await load();
             onChanged();
+          }}
+        />
+      )}
+
+      {showTransferTable && (
+        <TransferTableModal
+          table={table}
+          tables={tables}
+          onClose={() => setShowTransferTable(false)}
+          onTransferred={onChanged}
+          onDone={() => {
+            // The dining session — and everything in this popup — no
+            // longer belongs to `table`, which is now free. Close the
+            // whole drawer rather than leaving an empty/stale Occupied
+            // view open behind the modal.
+            setShowTransferTable(false);
+            onClose();
           }}
         />
       )}
