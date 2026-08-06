@@ -23,6 +23,8 @@ export default function ModalHeader({
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
+        flexWrap: "wrap",
+        rowGap: 8,
         marginBottom: 18,
       }}
     >
@@ -36,7 +38,7 @@ export default function ModalHeader({
       >
         {title}
       </span>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         {actions}
         <button
           type="button"

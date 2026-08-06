@@ -14,7 +14,6 @@ import {
 import TableCard from "@/components/admin/tables/TableCard";
 import TableDetailsDrawer from "@/components/admin/tables/TableDetailsDrawer";
 import ReservationForm from "@/components/admin/tables/ReservationForm";
-import CreateOrderFlow from "@/components/admin/tables/CreateOrderFlow";
 import TableAnalyticsPanel from "@/components/admin/tables/TableAnalyticsPanel";
 import ReservationCalendar from "@/components/admin/tables/ReservationCalendar";
 import QrCodesTab from "@/components/admin/tables/QrCodesTab";
@@ -57,10 +56,9 @@ export default function AdminTablesPage() {
 
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [showReservationForm, setShowReservationForm] = useState(false);
-  const [showCreateOrder, setShowCreateOrder] = useState(false);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const anyModalOpen = Boolean(selectedTableId) || showReservationForm || showCreateOrder;
+  const anyModalOpen = Boolean(selectedTableId) || showReservationForm;
 
   const load = useCallback(async () => {
     // Grid comes back numerically sorted by table number from the backend
@@ -132,9 +130,6 @@ export default function AdminTablesPage() {
         description="Live table status, dining sessions, and reservations"
         action={
           <div style={{ display: "flex", gap: 8 }}>
-            <TablePrimaryButton onClick={() => setShowCreateOrder(true)}>
-              <Plus size={15} /> Create Order
-            </TablePrimaryButton>
             <TablePrimaryButton onClick={() => setShowReservationForm(true)}>
               <Plus size={15} /> Reserve Table
             </TablePrimaryButton>
@@ -257,15 +252,6 @@ export default function AdminTablesPage() {
 
       {selectedTableId && (
         <TableDetailsDrawer tableId={selectedTableId} onClose={() => setSelectedTableId(null)} onChanged={load} />
-      )}
-
-      {showCreateOrder && (
-        <CreateOrderFlow
-          restaurantId={RESTAURANT_ID}
-          tables={tables}
-          onClose={() => setShowCreateOrder(false)}
-          onCreated={load}
-        />
       )}
 
       {showReservationForm && (

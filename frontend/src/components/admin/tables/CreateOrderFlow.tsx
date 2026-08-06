@@ -24,6 +24,8 @@ import {
 import { API_BASE_URL } from "@/lib/config";
 import { TablePrimaryButton } from "./tableButtons";
 import { TABLE_BUTTON_COLORS, statusMeta } from "./tableStatus";
+import { usePrinterStore } from "@/store/printer-store";
+import type { KOTOrder } from "@/lib/printer/kot";
 
 const FONT = "var(--font-body, 'Inter', system-ui, sans-serif)";
 const TAX_RATE = 0.05; // Mirrors backend/src/services/orderService.js TAX_RATE — display only, server recomputes.
@@ -74,30 +76,39 @@ function tableBlockedReason(table: TableGridItem): string {
 
 export default function CreateOrderFlow({
   restaurantId,
-  tables,
+  tables = [],
+  lockedTable,
   onClose,
   onCreated,
 }: {
   restaurantId: string;
-  tables: TableGridItem[];
+  tables?: TableGridItem[];
+  // Admin Create Order From Table — when opened from a specific table's
+  // Table Details Drawer (the "+ Create Order" button beside Print KOT),
+  // the table is already known: no Order Type / Table Selection / Customer
+  // Selection steps, straight to the menu. See TableDetailsDrawer.tsx.
+  lockedTable?: TableGridItem;
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const [orderType, setOrderType] = useState<OrderType | null>(null);
-  const [selectedTable, setSelectedTable] = useState<TableGridItem | null>(null);
+  const [orderType, setOrderType] = useState<OrderType | null>(lockedTable ? "dine-in" : null);
+  const [selectedTable, setSelectedTable] = useState<TableGridItem | null>(lockedTable ?? null);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
+  const [specialInstructions, setSpecialInstructions] = useState("");
 
-  const steps: Step[] = useMemo(
-    () => (orderType === "takeaway" ? ["orderType", "customer", "menu", "summary"] : ["orderType", "table", "customer", "menu", "summary"]),
-    [orderType]
-  );
+  const steps: Step[] = useMemo(() => {
+    if (lockedTable) return ["menu", "summary"];
+    return orderType === "takeaway" ? ["orderType", "customer", "menu", "summary"] : ["orderType", "table", "customer", "menu", "summary"];
+  }, [orderType, lockedTable]);
   const [stepIndex, setStepIndex] = useState(0);
-  const step = steps[stepIndex] ?? "orderType";
+  const step = steps[stepIndex] ?? steps[0];
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const printKotViaQz = usePrinterStore((s) => s.printKOT);
 
   // Escape-to-close, matching every other modal in this module.
   useEffect(() => {
@@ -137,17 +148,47 @@ export default function CreateOrderFlow({
     setCart((prev) => prev.filter((l) => l.menuItem.id !== itemId));
   };
 
-  const handleSubmit = async () => {
+  // `printKot` — "Create & Print KOT" (Admin Create Order From Table):
+  // after the order is created against the table's active session, force
+  // a KOT print for just this new order via the existing QZ Tray
+  // integration (same pipeline as TableDetailsDrawer's "Print KOT" /
+  // Reprint button), regardless of the Auto Print KOT setting. Best-effort
+  // — a print failure here is surfaced but never blocks the order from
+  // having been created (the admin can always reprint from the table
+  // popup's header button afterwards), matching the "never throws into
+  // the order-creation response" pattern used elsewhere for KOT printing.
+  const handleSubmit = async (printKot = false) => {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await createAdminOrder({
+      const order = await createAdminOrder({
         orderType: orderType!,
         tableId: orderType === "dine-in" ? selectedTable?._id : undefined,
         items: cart.map((l) => ({ id: l.menuItem.id, quantity: l.quantity, notes: l.notes })),
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
+        specialInstructions: specialInstructions.trim() || undefined,
       });
+
+      if (printKot) {
+        try {
+          const kot: KOTOrder = {
+            orderId: order.orderId,
+            tableLabel: order.tableLabel,
+            orderType: order.orderType,
+            placedAt: order.placedAt,
+            specialInstructions: order.specialInstructions,
+            items: (order.items ?? []).map((line) => ({
+              item: { name: line.item.name, categoryTitle: line.item.categoryTitle },
+              quantity: line.quantity,
+            })),
+          };
+          await printKotViaQz(kot);
+        } catch (printErr) {
+          console.error("Create & Print KOT: KOT print failed (order was still created):", printErr);
+        }
+      }
+
       onCreated();
       onClose();
     } catch (err) {
@@ -188,11 +229,11 @@ export default function CreateOrderFlow({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {stepIndex > 0 && (
+          {(stepIndex > 0 || Boolean(lockedTable)) && (
             <button
               type="button"
               aria-label="Back"
-              onClick={goBack}
+              onClick={stepIndex > 0 ? goBack : onClose}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -221,7 +262,7 @@ export default function CreateOrderFlow({
               Create Order
             </div>
             <div style={{ fontFamily: FONT, fontSize: 12, color: adminColors.textSecondary, marginTop: 2 }}>
-              Step {stepIndex + 1} of {steps.length} · {stepLabels[step]}
+              {lockedTable ? lockedTable.label : `Step ${stepIndex + 1} of ${steps.length} · ${stepLabels[step]}`}
             </div>
           </div>
         </div>
@@ -296,6 +337,8 @@ export default function CreateOrderFlow({
             grandTotal={grandTotal}
             onChangeQuantity={changeQuantity}
             onRemove={removeLine}
+            specialInstructions={specialInstructions}
+            onChangeSpecialInstructions={setSpecialInstructions}
           />
         )}
       </div>
@@ -354,8 +397,35 @@ export default function CreateOrderFlow({
 
           {step === "customer" && <TablePrimaryButton onClick={goNext}>Continue to Menu</TablePrimaryButton>}
 
-          {step === "summary" && (
-            <TablePrimaryButton onClick={handleSubmit} disabled={submitting || cart.length === 0}>
+          {step === "summary" && lockedTable && (
+            <>
+              <button
+                type="button"
+                onClick={() => handleSubmit(false)}
+                disabled={submitting || cart.length === 0}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 10,
+                  border: `1px solid ${adminColors.primary}`,
+                  background: "#FFFFFF",
+                  color: adminColors.primary,
+                  fontFamily: FONT,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: submitting || cart.length === 0 ? "not-allowed" : "pointer",
+                  opacity: submitting || cart.length === 0 ? 0.6 : 1,
+                }}
+              >
+                {submitting ? "Creating…" : "Create Order"}
+              </button>
+              <TablePrimaryButton onClick={() => handleSubmit(true)} disabled={submitting || cart.length === 0}>
+                {submitting ? "Creating…" : "Create & Print KOT"}
+              </TablePrimaryButton>
+            </>
+          )}
+
+          {step === "summary" && !lockedTable && (
+            <TablePrimaryButton onClick={() => handleSubmit(false)} disabled={submitting || cart.length === 0}>
               {submitting ? "Sending…" : "Send to Kitchen"}
             </TablePrimaryButton>
           )}
@@ -968,6 +1038,8 @@ function SummaryStep({
   grandTotal,
   onChangeQuantity,
   onRemove,
+  specialInstructions,
+  onChangeSpecialInstructions,
 }: {
   cart: CartLine[];
   subtotal: number;
@@ -975,6 +1047,8 @@ function SummaryStep({
   grandTotal: number;
   onChangeQuantity: (itemId: string, delta: number) => void;
   onRemove: (itemId: string) => void;
+  specialInstructions?: string;
+  onChangeSpecialInstructions?: (v: string) => void;
 }) {
   if (cart.length === 0) {
     return (
@@ -1030,6 +1104,33 @@ function SummaryStep({
         <SummaryRow label="Taxes (5%)" value={formatCurrency(taxAmount)} />
         <SummaryRow label="Grand Total" value={formatCurrency(grandTotal)} bold />
       </div>
+
+      {onChangeSpecialInstructions && (
+        <div style={{ maxWidth: 640, marginTop: 20 }}>
+          <span style={{ fontFamily: FONT, fontSize: 12, fontWeight: 700, color: adminColors.textSecondary, textTransform: "uppercase" }}>
+            Special Instructions (optional)
+          </span>
+          <textarea
+            value={specialInstructions ?? ""}
+            onChange={(e) => onChangeSpecialInstructions(e.target.value)}
+            placeholder="Notes for the whole order, e.g. Serve quickly, birthday table"
+            rows={2}
+            style={{
+              width: "100%",
+              marginTop: 8,
+              padding: "10px 12px",
+              borderRadius: 8,
+              border: `1px solid ${adminColors.border}`,
+              fontFamily: FONT,
+              fontSize: 13,
+              color: adminColors.text,
+              outline: "none",
+              resize: "vertical",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

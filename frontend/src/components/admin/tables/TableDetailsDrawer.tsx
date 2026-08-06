@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Printer, Receipt, Check } from "lucide-react";
+import { Printer, Receipt, Check, Plus } from "lucide-react";
 import { Modal, SecondaryButton, PrimaryButton, Select, Badge, adminColors } from "@/components/admin/ui";
 import {
   fetchTableDetails,
@@ -27,6 +27,7 @@ import { statusMeta, formatCurrency, formatTime } from "./tableStatus";
 import { TablePrimaryButton } from "./tableButtons";
 import ModalHeader from "./ModalHeader";
 import ThermalReceipt from "./ThermalReceipt";
+import TableCreateOrderScreen from "./TableCreateOrderScreen";
 import { usePrinterStore, PrinterError, type KotPrintResult } from "@/store/printer-store";
 import type { KOTOrder } from "@/lib/printer/kot";
 import { getGstBreakdown, getGstRateLabel } from "@/lib/billing";
@@ -114,6 +115,11 @@ export default function TableDetailsDrawer({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Per-table Create Order screen — replaces the old global 5-step wizard.
+  // Opened directly from this table's header, next to Print KOT, since the
+  // table (and its active session, if any) is already known here.
+  const [showCreateOrder, setShowCreateOrder] = useState(false);
 
   // Print workflow state — separate from `busy`/`error` above so a print
   // failure never blocks the other billing actions (Close Session, Mark
@@ -392,6 +398,13 @@ export default function TableDetailsDrawer({
   const billLocked = Boolean(session?.billSubmitted || session?.paymentStatus === "paid");
   const activeOffers = offers.filter((o) => o.isActive);
 
+  // Mirrors ADMIN_ORDERABLE_TABLE_STATUSES in
+  // backend/src/services/orderService.js — a table can take a manually
+  // created order while it's "available" (no session yet — one is opened
+  // automatically) or "occupied" (attaches to the existing active
+  // session). Reserved / billing / cleaning / out-of-service tables can't.
+  const canCreateOrder = table.status === "available" || table.status === "occupied";
+
   return (
     <Modal
       title={table.label}
@@ -400,33 +413,61 @@ export default function TableDetailsDrawer({
           title={table.label}
           onClose={onClose}
           actions={
-            session && (
-              <button
-                type="button"
-                onClick={handlePrintKot}
-                disabled={kotBusy || activeOrderCount === 0}
-                title={activeOrderCount === 0 ? "No active orders to reprint" : "Reprint the KOT for this session"}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "6px 12px",
-                  borderRadius: 8,
-                  border: `1px solid ${adminColors.border}`,
-                  background: "#FFFFFF",
-                  color: kotBusy || activeOrderCount === 0 ? adminColors.textSecondary : adminColors.text,
-                  fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: kotBusy || activeOrderCount === 0 ? "not-allowed" : "pointer",
-                  whiteSpace: "nowrap",
-                  opacity: kotBusy || activeOrderCount === 0 ? 0.6 : 1,
-                }}
-              >
-                <Printer size={13} />
-                {kotBusy ? "Printing…" : "Print KOT"}
-              </button>
-            )
+            <>
+              {session && (
+                <button
+                  type="button"
+                  onClick={handlePrintKot}
+                  disabled={kotBusy || activeOrderCount === 0}
+                  title={activeOrderCount === 0 ? "No active orders to reprint" : "Reprint the KOT for this session"}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "6px 12px",
+                    borderRadius: 8,
+                    border: `1px solid ${adminColors.border}`,
+                    background: "#FFFFFF",
+                    color: kotBusy || activeOrderCount === 0 ? adminColors.textSecondary : adminColors.text,
+                    fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: kotBusy || activeOrderCount === 0 ? "not-allowed" : "pointer",
+                    whiteSpace: "nowrap",
+                    opacity: kotBusy || activeOrderCount === 0 ? 0.6 : 1,
+                  }}
+                >
+                  <Printer size={13} />
+                  {kotBusy ? "Printing…" : "Print KOT"}
+                </button>
+              )}
+
+              {canCreateOrder && (
+                <button
+                  type="button"
+                  onClick={() => setShowCreateOrder(true)}
+                  title={`Create a new order for ${table.label}`}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "6px 12px",
+                    borderRadius: 8,
+                    border: `1px solid ${adminColors.primary}`,
+                    background: adminColors.primary,
+                    color: "#FFFFFF",
+                    fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <Plus size={13} />
+                  Create Order
+                </button>
+              )}
+            </>
           }
         />
       }
@@ -641,6 +682,23 @@ export default function TableDetailsDrawer({
           receipt={printModal.receipt}
           qzPrinted={printModal.qzPrinted}
           onClose={() => setPrintModal(null)}
+        />
+      )}
+
+      {showCreateOrder && (
+        <TableCreateOrderScreen
+          restaurantId={table.restaurantId}
+          tableId={table._id}
+          tableLabel={table.label}
+          onClose={() => setShowCreateOrder(false)}
+          onCreated={async () => {
+            // Refresh Ordered Items / Order Count / Total Amount / Kitchen
+            // Status right here in the same Table Details popup, and let
+            // the Table Grid behind it refresh too — the dining session
+            // stays exactly as it was, just with the new order attached.
+            await load();
+            onChanged();
+          }}
         />
       )}
     </Modal>
