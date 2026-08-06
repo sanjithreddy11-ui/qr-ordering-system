@@ -560,31 +560,6 @@ export default function TableDetailsDrawer({
             <DetailRow label="Grand Total" value={formatCurrency(breakdown?.grandTotal ?? session.currentBill)} bold />
           </Section>
 
-          {/* Payment Information */}
-          <Section title="Payment Information">
-            <DetailRow
-              label="Payment Method"
-              value={session.paymentMethod ? PAYMENT_METHOD_LABEL[session.paymentMethod] : "Not chosen yet"}
-            />
-            <DetailRow label="Payment Status" value={session.paymentStatus === "paid" ? "Paid" : "Pending"} />
-            <DetailRow label="Order Status" value={orderStatusLabel(orderStatus)} />
-          </Section>
-
-          {printNotice && (
-            <p style={{ ...bodyText(12, 600), color: printNotice.ok ? adminColors.success : adminColors.danger, margin: 0 }}>
-              {printNotice.message}
-            </p>
-          )}
-          {kotNotice && (
-            <p style={{ ...bodyText(12, 600), color: kotNotice.ok ? adminColors.success : adminColors.danger, margin: 0 }}>
-              {kotNotice.message}
-            </p>
-          )}
-          {submitNotice && (
-            <p style={{ ...bodyText(12, 600), color: submitNotice.ok ? adminColors.success : adminColors.danger, margin: 0 }}>
-              {submitNotice.message}
-            </p>
-          )}
         </div>
       )}
 
