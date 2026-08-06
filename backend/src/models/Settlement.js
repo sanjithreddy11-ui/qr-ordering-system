@@ -68,6 +68,13 @@ const settlementSchema = new mongoose.Schema(
     // up automatically with no extra aggregation changes needed.
     discount: { type: Number, default: 0 },
     offerName: { type: String, default: null },
+    // Discount Tracking: the offer catalog doc's id at the time it was
+    // applied, frozen alongside offerName from TableSession.appliedOffer.
+    // Lets Offer Performance analytics group by a stable id (an offer can be
+    // renamed/deleted later without merging into a different bucket) while
+    // offerName above remains what's actually shown on the printed bill.
+    // Null whenever no offer was used, same as offerName.
+    offerId: { type: mongoose.Schema.Types.ObjectId, ref: "Offer", default: null },
     grandTotal: { type: Number, required: true },
 
     // Payment Collection Tracking: recalculated every time Collect Payment
@@ -141,5 +148,8 @@ settlementSchema.index({ restaurantId: 1, submittedAt: -1 });
 settlementSchema.index({ restaurantId: 1, settlementTime: -1 });
 settlementSchema.index({ restaurantId: 1, paymentStatus: 1 });
 settlementSchema.index({ restaurantId: 1, outstandingAmount: 1 });
+// Discount Tracking: powers getSettlementAnalytics' Offer Performance
+// aggregation (restaurantId + submittedAt range, grouped by offerId).
+settlementSchema.index({ restaurantId: 1, offerId: 1, submittedAt: -1 });
 
 module.exports = mongoose.model("Settlement", settlementSchema);

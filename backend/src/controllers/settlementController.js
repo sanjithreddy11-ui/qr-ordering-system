@@ -379,7 +379,29 @@ const getSettlementAnalytics = asyncHandler(async (req, res) => {
 
   const { from, to } = resolveRange(req.query);
 
-  const [billedAgg, collectedAgg, pendingAgg, creditAgg, revenueAgg, splitAgg, collectionStatusAgg] = await Promise.all([
+  // Discount Tracking Module: same restaurantId + submittedAt-range match as
+  // billedAgg above (a settlement is "billed"/complete the moment Submit
+  // Bill locks it in — see services/settlementService.js), with cancelled
+  // settlements excluded per spec ("only completed bills, ignore
+  // cancelled"). Computed in the database via aggregation (not fetched into
+  // memory) so this stays fast as the settlements collection grows.
+  const discountMatch = {
+    restaurantId,
+    submittedAt: { $gte: from, $lte: to },
+    paymentStatus: { $ne: "cancelled" },
+  };
+
+  const [
+    billedAgg,
+    collectedAgg,
+    pendingAgg,
+    creditAgg,
+    revenueAgg,
+    splitAgg,
+    collectionStatusAgg,
+    discountSummaryAgg,
+    offerPerformanceAgg,
+  ] = await Promise.all([
     Settlement.aggregate([
       { $match: { restaurantId, submittedAt: { $gte: from, $lte: to } } },
       { $group: { _id: null, total: { $sum: "$grandTotal" } } },
@@ -450,6 +472,40 @@ const getSettlementAnalytics = asyncHandler(async (req, res) => {
       },
       { $group: { _id: "$collectionStatus", count: { $sum: 1 }, remaining: { $sum: "$remainingAmount" } } },
     ]),
+    // Discount Tracking Module: Gross Sales / Discounts / Taxable Amount /
+    // GST / Net Revenue in a single grouped pass over discountMatch.
+    Settlement.aggregate([
+      { $match: discountMatch },
+      {
+        $group: {
+          _id: null,
+          grossSales: { $sum: "$subtotal" },
+          totalDiscount: { $sum: "$discount" },
+          taxableAmount: { $sum: "$taxableAmount" },
+          gstCollected: { $sum: { $add: [{ $ifNull: ["$cgstAmount", 0] }, { $ifNull: ["$sgstAmount", 0] }] } },
+          netRevenue: { $sum: "$grandTotal" },
+        },
+      },
+    ]),
+    // Discount Tracking Module: Offer Performance table — how many times
+    // each offer was used and the total discount it gave, in this range.
+    // Grouped by offerId when available (added alongside offerName — see
+    // models/Settlement.js) and falls back to offerName for any settlement
+    // billed before that field existed, so historical discount data isn't
+    // dropped from the table.
+    Settlement.aggregate([
+      { $match: { ...discountMatch, discount: { $gt: 0 } } },
+      {
+        $group: {
+          _id: { $ifNull: ["$offerId", "$offerName"] },
+          offerId: { $first: "$offerId" },
+          offerName: { $first: "$offerName" },
+          timesUsed: { $sum: 1 },
+          totalDiscount: { $sum: "$discount" },
+        },
+      },
+      { $sort: { totalDiscount: -1 } },
+    ]),
   ]);
 
   const byMethod = Object.fromEntries(collectedAgg.map((r) => [r._id, r.total]));
@@ -486,6 +542,21 @@ const getSettlementAnalytics = asyncHandler(async (req, res) => {
     collectionRemaining.PARTIALLY_PAID + collectionRemaining.UNPAID
   );
 
+  // Discount Tracking Module
+  const discountSummary = discountSummaryAgg[0] || {
+    grossSales: 0,
+    totalDiscount: 0,
+    taxableAmount: 0,
+    gstCollected: 0,
+    netRevenue: 0,
+  };
+  const offersUsed = offerPerformanceAgg.map((r) => ({
+    offerId: r.offerId ? String(r.offerId) : null,
+    offerName: r.offerName || "Unknown Offer",
+    timesUsed: r.timesUsed,
+    totalDiscount: round2(r.totalDiscount),
+  }));
+
   res.json({
     range: { from, to },
     // Overview cards (Section 3)
@@ -507,6 +578,18 @@ const getSettlementAnalytics = asyncHandler(async (req, res) => {
       unpaid: collectionCounts.UNPAID,
       outstandingFromPartialOrUnpaid: partialPaymentsOutstanding,
     },
+    // Discount Tracking Module: "Today's Discounts" KPI card + Discount
+    // Summary + Offer Performance sections on the Dashboard. Same range as
+    // every other field on this response (today by default), only completed
+    // (non-cancelled) settlements. Matches the analytics API contract:
+    // { grossSales, totalDiscount, taxableAmount, gstCollected, netRevenue,
+    //   offersUsed: [{ offerId, offerName, timesUsed, totalDiscount }] }
+    grossSales: round2(discountSummary.grossSales || 0),
+    totalDiscount: round2(discountSummary.totalDiscount || 0),
+    taxableAmount: round2(discountSummary.taxableAmount || 0),
+    gstCollected: round2(discountSummary.gstCollected || 0),
+    netRevenue: round2(discountSummary.netRevenue || 0),
+    offersUsed,
     reports: {
       totalCashCollection: cashCollected,
       totalOnlineCollection: onlineCollected,

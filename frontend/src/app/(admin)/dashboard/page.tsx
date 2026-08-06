@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   TrendingUp,
@@ -16,6 +16,7 @@ import {
   Tag,
   ArrowRight,
   BarChart3,
+  Percent,
 } from "lucide-react";
 import {
   BarChart,
@@ -27,6 +28,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { PageHeader, Card, adminColors } from "@/components/admin/ui";
+import { getSocket } from "@/lib/socket";
 import {
   fetchAnalytics,
   fetchRecentOrders,
@@ -46,6 +48,20 @@ const bodyFont = "var(--font-body, 'Inter', system-ui, sans-serif)";
 // the shared design system.
 const UPI_ACCENT = "#7E57C2";
 const CARD_ACCENT = "#2E86AB";
+const DISCOUNT_ACCENT = "#C9971F";
+
+// Discount Tracking Module: the dashboard should always show live values —
+// refetch analytics whenever a bill is submitted/collected, or an offer is
+// applied/removed on any active session. Mirrors the Settlements page's
+// LIVE_EVENTS (see dashboard/settlements/page.tsx) plus sessionPaymentUpdated,
+// which is what fires on offer apply/remove (see
+// sockets/socket.js:emitSessionPaymentUpdated).
+const LIVE_EVENTS = [
+  "settlementCreated",
+  "settlementUpdated",
+  "sessionPaymentUpdated",
+  "sessionEnded",
+];
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -219,6 +235,16 @@ export default function AdminOverviewPage() {
   const [liveOrders, setLiveOrders] = useState<RecentOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Discount Tracking Module: split out so it can be re-run on live socket
+  // events (below) without re-fetching the summary/trend/orders too.
+  const loadPaymentsToday = useCallback(async () => {
+    try {
+      setPaymentsToday(await fetchSettlementAnalytics(RESTAURANT_ID, "today"));
+    } catch {
+      // Non-fatal — the payment/discount cards just stay at their last value.
+    }
+  }, []);
+
   useEffect(() => {
     const toDate = new Date();
     const fromDate = new Date(toDate.getTime() - 6 * 24 * 60 * 60 * 1000); // last 7 days incl. today
@@ -238,6 +264,20 @@ export default function AdminOverviewPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  // Discount Tracking Module (Step 6): keep "Today's Discounts", Discount
+  // Summary, and Offer Performance live — refresh the moment a bill is
+  // submitted/collected or an offer is applied/removed on any table.
+  useEffect(() => {
+    const socket = getSocket();
+    socket.emit("join-tables", RESTAURANT_ID);
+    const handler = () => loadPaymentsToday();
+    LIVE_EVENTS.forEach((evt) => socket.on(evt, handler));
+    return () => {
+      LIVE_EVENTS.forEach((evt) => socket.off(evt, handler));
+      socket.emit("leave-tables", RESTAURANT_ID);
+    };
+  }, [loadPaymentsToday]);
 
   return (
     <div>
@@ -285,6 +325,13 @@ export default function AdminOverviewPage() {
               value={`₹ ${(paymentsToday?.cardCollected ?? 0).toLocaleString("en-IN")}`}
               subtitle="From card payments"
               accent={CARD_ACCENT}
+            />
+            <PaymentHighlightCard
+              icon={Percent}
+              label="Today's Discounts"
+              value={`₹ ${(paymentsToday?.totalDiscount ?? 0).toLocaleString("en-IN")}`}
+              subtitle="Total discounts given today"
+              accent={DISCOUNT_ACCENT}
             />
           </div>
 
@@ -336,6 +383,101 @@ export default function AdminOverviewPage() {
                 <QuickAction icon={Printer} label="Printer Settings" href="/dashboard/settings" />
                 <QuickAction icon={Tag} label="Create Offer" href="/dashboard/offers" />
               </div>
+            </Card>
+          </div>
+
+          {/* ---- Discount Summary + Offer Performance ---- */}
+          <div
+            className="grid grid-cols-1 lg:grid-cols-[1fr_1.3fr]"
+            style={{ gap: 16, marginBottom: 24, alignItems: "start" }}
+          >
+            <Card>
+              <SectionTitle>Discount Summary</SectionTitle>
+              {(
+                [
+                  { label: "Gross Sales", value: paymentsToday?.grossSales, negative: false },
+                  { label: "Discounts", value: paymentsToday?.totalDiscount, negative: true },
+                  { label: "Taxable Amount", value: paymentsToday?.taxableAmount, negative: false },
+                  { label: "GST", value: paymentsToday?.gstCollected, negative: false },
+                ] as { label: string; value: number | undefined; negative: boolean }[]
+              ).map((row) => (
+                <div
+                  key={row.label}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "10px 0",
+                    borderBottom: `1px solid ${adminColors.border}`,
+                  }}
+                >
+                  <span style={{ fontFamily: bodyFont, fontSize: 13, color: adminColors.textSecondary }}>
+                    {row.label}
+                  </span>
+                  <span style={{ fontFamily: bodyFont, fontSize: 14, fontWeight: 700, color: adminColors.text }}>
+                    {row.negative && (row.value ?? 0) > 0 ? "− " : ""}₹ {(row.value ?? 0).toLocaleString("en-IN")}
+                  </span>
+                </div>
+              ))}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "12px 0 0",
+                }}
+              >
+                <span style={{ fontFamily: bodyFont, fontSize: 13, fontWeight: 700, color: adminColors.text }}>
+                  Net Revenue
+                </span>
+                <span style={{ fontFamily: bodyFont, fontSize: 18, fontWeight: 800, color: adminColors.primary }}>
+                  ₹ {(paymentsToday?.netRevenue ?? 0).toLocaleString("en-IN")}
+                </span>
+              </div>
+            </Card>
+
+            <Card>
+              <SectionTitle>Offer Performance</SectionTitle>
+              {(paymentsToday?.offersUsed?.length ?? 0) === 0 ? (
+                <p style={{ fontFamily: bodyFont, fontSize: 13, color: adminColors.textSecondary }}>
+                  No offers used today.
+                </p>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ textAlign: "left" }}>
+                        {["Offer", "Times Used", "Total Discount"].map((h) => (
+                          <th
+                            key={h}
+                            style={{
+                              fontFamily: bodyFont,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: adminColors.textSecondary,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.04em",
+                              padding: "8px 10px",
+                              borderBottom: `1px solid ${adminColors.border}`,
+                            }}
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paymentsToday!.offersUsed.map((o) => (
+                        <tr key={o.offerId ?? o.offerName}>
+                          <td style={cellStyle}>{o.offerName}</td>
+                          <td style={cellStyle}>{o.timesUsed}</td>
+                          <td style={cellStyle}>₹ {o.totalDiscount.toLocaleString("en-IN")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </Card>
           </div>
 

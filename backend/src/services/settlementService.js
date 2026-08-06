@@ -109,6 +109,7 @@ async function submitBillForTable(tableId, staff) {
     igstAmount,
     discount,
     offerName: session.appliedOffer?.name || null,
+    offerId: session.appliedOffer?.offerId || null,
     grandTotal,
     paymentStatus: "pending",
     // Payment Collection Tracking: nothing has been collected yet, so the

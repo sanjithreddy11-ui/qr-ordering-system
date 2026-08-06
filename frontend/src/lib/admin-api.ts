@@ -1323,6 +1323,20 @@ export interface SettlementAnalytics {
     partialPayments: number;
     splitPayments: number;
   };
+  /** Discount Tracking Module — same range as everything else above (today by default). */
+  grossSales: number;
+  totalDiscount: number;
+  taxableAmount: number;
+  gstCollected: number;
+  netRevenue: number;
+  offersUsed: OfferUsage[];
+}
+
+export interface OfferUsage {
+  offerId: string | null;
+  offerName: string;
+  timesUsed: number;
+  totalDiscount: number;
 }
 
 export async function fetchSettlementAnalytics(
