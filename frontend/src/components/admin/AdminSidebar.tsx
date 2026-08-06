@@ -27,8 +27,6 @@ import { useAuthStore } from "@/store/auth-store";
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Menu", href: "/dashboard/menu", icon: UtensilsCrossed },
-  { label: "Stock Management", href: "/dashboard/stock", icon: Package },
-  { label: "Investment & Expenses", href: "/dashboard/investment", icon: PiggyBank },
   { label: "Tables & QR", href: "/dashboard/tables", icon: QrCode },
   { label: "Orders", href: "/dashboard/orders", icon: Receipt },
   { label: "GST Management", href: "/dashboard/gst", icon: Percent },

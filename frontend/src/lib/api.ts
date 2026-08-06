@@ -20,7 +20,9 @@ async function handle<T>(res: Response): Promise<T> {
 }
 
 export async function fetchMenu(restaurantId: string): Promise<MenuCategory[]> {
-  const res = await fetch(API_ENDPOINTS.menu(restaurantId), { cache: "no-store" });
+  const res = await fetch(API_ENDPOINTS.menu(restaurantId), {
+    next: { revalidate: 30 },
+  });
   const data = await handle<{ menu: MenuCategory[] }>(res);
   return data.menu;
 }
@@ -137,7 +139,9 @@ export async function fetchOrdersBySession(
 }
 
 export async function fetchRestaurant(restaurantId: string): Promise<Restaurant> {
-  const res = await fetch(API_ENDPOINTS.restaurant(restaurantId), { cache: "no-store" });
+  const res = await fetch(API_ENDPOINTS.restaurant(restaurantId), {
+    next: { revalidate: 60 },
+  });
   const data = await handle<{ restaurant: Restaurant }>(res);
   return data.restaurant;
 }

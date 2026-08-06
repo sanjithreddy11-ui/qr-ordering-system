@@ -13,8 +13,6 @@ if (!process.env.JWT_SECRET) {
 }
 
 async function start() {
-  await connectDB();
-
   const app = createApp(CLIENT_ORIGIN);
   const httpServer = http.createServer(app);
 
@@ -24,6 +22,12 @@ async function start() {
     console.log(`SmartQR backend running on http://localhost:${PORT}`);
     console.log(`Accepting requests from: ${CLIENT_ORIGIN}`);
   });
+
+  try {
+    await connectDB();
+  } catch (err) {
+    console.error("DB connection failed on startup:", err.message);
+  }
 }
 
 start();
