@@ -91,8 +91,14 @@ const KITCHEN_CATEGORY_SET = new Set(KITCHEN_CATEGORIES.map(normalizeCategory));
  * created before this routing table is updated) falls back to the Kitchen
  * Printer, so an unrecognized item is never silently dropped from every
  * KOT — it still reaches a printer, just not necessarily the ideal one.
+ *
+ * Exported (previously module-private) so UI that needs to *display* an
+ * item's destination printer ahead of printing — e.g. the Print KOT
+ * selection modal's per-item badge — can call the exact same routing
+ * decision `splitKOTItemsByPrinter`/`buildEscPosKOT` will use, instead of
+ * re-deriving it. Never call this to change routing; it's read-only.
  */
-function resolvePrinterRole(categoryTitle: string | undefined): KOTPrinterRole {
+export function resolvePrinterRole(categoryTitle: string | undefined): KOTPrinterRole {
   const key = normalizeCategory(categoryTitle ?? "");
   if (COUNTER_CATEGORY_SET.has(key)) return "counter";
   if (KITCHEN_CATEGORY_SET.has(key)) return "kitchen";

@@ -30,8 +30,8 @@ import ModalHeader from "./ModalHeader";
 import ThermalReceipt from "./ThermalReceipt";
 import TableCreateOrderScreen from "./TableCreateOrderScreen";
 import TransferTableModal from "./TransferTableModal";
-import { usePrinterStore, PrinterError, type KotPrintResult } from "@/store/printer-store";
-import type { KOTOrder } from "@/lib/printer/kot";
+import { usePrinterStore, PrinterError } from "@/store/printer-store";
+import PrintKotModal from "./PrintKotModal";
 import { getGstBreakdown, getGstRateLabel } from "@/lib/billing";
 
 // "₹100 Off" / "10% Off" — same label shown in the Offers & Discounts admin
@@ -152,11 +152,22 @@ export default function TableDetailsDrawer({
   const [printNotice, setPrintNotice] = useState<{ ok: boolean; message: string } | null>(null);
   const [printModal, setPrintModal] = useState<{ heading: string; receipt: ReceiptData; qzPrinted: boolean } | null>(null);
 
-  // Reprint KOT (drawer header button) — separate busy/notice state so a
-  // KOT reprint failure never blocks Print Bill / Submit Bill / other
-  // actions, and vice versa.
-  const [kotBusy, setKotBusy] = useState(false);
+  // Print KOT (drawer header button) — opens the item-selection modal
+  // below instead of printing immediately. `kotNotice` is a small
+  // self-dismissing toast (separate from `error`/`printNotice`) so a KOT
+  // print result never blocks Print Bill / Submit Bill / other actions,
+  // and vice versa.
+  const [showPrintKotModal, setShowPrintKotModal] = useState(false);
   const [kotNotice, setKotNotice] = useState<{ ok: boolean; message: string } | null>(null);
+  const kotToastTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showKotToast = (notice: { ok: boolean; message: string }) => {
+    setKotNotice(notice);
+    if (kotToastTimeout.current) clearTimeout(kotToastTimeout.current);
+    if (notice.ok) {
+      kotToastTimeout.current = setTimeout(() => setKotNotice(null), 4000);
+    }
+  };
 
   // Settlements Module — "Submit Bill" state, separate from `busy` so a
   // failure here never blocks Print Bill / other actions.
@@ -318,66 +329,27 @@ export default function TableDetailsDrawer({
     }
   };
 
-  // Reprint KOT — Table Details Drawer header button.
+  // Print KOT — Table Details Drawer header button.
   //
-  // This does NOT generate a new KOT or write anything to the database. It
-  // simply re-runs the same two steps that already happen automatically
-  // when an order is placed (see KotAutoPrintProvider.tsx):
+  // Opens the Print KOT selection modal (PrintKotModal.tsx) rather than
+  // printing immediately, so the admin can choose exactly which items to
+  // (re)print instead of always reprinting the whole order. The modal
+  // itself does the actual printing — it reuses the same pipeline this
+  // button used to call directly:
   //   1. buildEscPosKOT/splitKOTItemsByPrinter (frontend/src/lib/printer/kot.ts)
   //   2. usePrinterStore().printKOT, which resolves the configured Kitchen
   //      Printer / Counter Printer and sends each ticket via QZ Tray.
-  // The `orders` array here is exactly what fetchSessionOrders already
-  // loaded for this drawer — the same Order documents (with each item's
-  // categoryTitle) that were used to print the KOT the first time — so
-  // this is a byte-for-byte reprint of the existing KOT(s) for the
-  // session's active (non-cancelled) orders, not a new document.
-  const handlePrintKot = async () => {
-    setKotBusy(true);
-    setKotNotice(null);
-    try {
-      const activeOrders = orders.filter((o) => o.status !== "cancelled");
-      if (activeOrders.length === 0) {
-        setKotNotice({ ok: false, message: "No active orders for this session to reprint." });
-        return;
-      }
-
-      const results = await Promise.all(
-        activeOrders.map(async (order) => {
-          const kot: KOTOrder = {
-            orderId: order.orderId,
-            tableLabel: order.tableLabel,
-            orderType: order.orderType,
-            placedAt: order.placedAt,
-            specialInstructions: order.specialInstructions,
-            items: (order.items ?? []).map((line) => ({
-              item: { name: line.item.name, categoryTitle: line.item.categoryTitle },
-              quantity: line.quantity,
-              modifiers: line.modifiers,
-            })),
-          };
-          const result: KotPrintResult = await printKotViaQz(kot);
-          return { orderId: order.orderId, result };
-        })
-      );
-
-      const failures = results.flatMap(({ orderId, result }) => [
-        !result.kitchen.ok ? `Order #${orderId.slice(-6)} · Kitchen Printer — ${result.kitchen.error}` : null,
-        !result.counter.ok ? `Order #${orderId.slice(-6)} · Counter Printer — ${result.counter.error}` : null,
-      ].filter((m): m is string => Boolean(m)));
-
-      if (failures.length === 0) {
-        setKotNotice({
-          ok: true,
-          message: results.length > 1 ? `KOT reprinted for ${results.length} orders.` : "KOT reprinted successfully.",
-        });
-      } else {
-        setKotNotice({ ok: false, message: failures.join(" · ") });
-      }
-    } catch (err) {
-      setKotNotice({ ok: false, message: err instanceof PrinterError ? err.message : "Could not reprint KOT." });
-    } finally {
-      setKotBusy(false);
+  // — just scoped to the selected items instead of every item. The
+  // `orders` array passed to it is exactly what fetchSessionOrders already
+  // loaded for this drawer (the same Order documents, with each item's
+  // categoryTitle, used to print the KOT the first time).
+  const handlePrintKot = () => {
+    const activeOrders = orders.filter((o) => o.status !== "cancelled");
+    if (activeOrders.length === 0) {
+      showKotToast({ ok: false, message: "No active orders for this session to print." });
+      return;
     }
+    setShowPrintKotModal(true);
   };
 
   if (loading || !table) {
@@ -443,8 +415,8 @@ export default function TableDetailsDrawer({
                 <button
                   type="button"
                   onClick={handlePrintKot}
-                  disabled={kotBusy || activeOrderCount === 0}
-                  title={activeOrderCount === 0 ? "No active orders to reprint" : "Reprint the KOT for this session"}
+                  disabled={activeOrderCount === 0}
+                  title={activeOrderCount === 0 ? "No active orders to print" : "Choose items to print on the KOT"}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -453,17 +425,17 @@ export default function TableDetailsDrawer({
                     borderRadius: 8,
                     border: `1px solid ${adminColors.border}`,
                     background: "#FFFFFF",
-                    color: kotBusy || activeOrderCount === 0 ? adminColors.textSecondary : adminColors.text,
+                    color: activeOrderCount === 0 ? adminColors.textSecondary : adminColors.text,
                     fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
                     fontSize: 12,
                     fontWeight: 700,
-                    cursor: kotBusy || activeOrderCount === 0 ? "not-allowed" : "pointer",
+                    cursor: activeOrderCount === 0 ? "not-allowed" : "pointer",
                     whiteSpace: "nowrap",
-                    opacity: kotBusy || activeOrderCount === 0 ? 0.6 : 1,
+                    opacity: activeOrderCount === 0 ? 0.6 : 1,
                   }}
                 >
                   <Printer size={13} />
-                  {kotBusy ? "Printing…" : "Print KOT"}
+                  Print KOT
                 </button>
               )}
 
@@ -781,6 +753,50 @@ export default function TableDetailsDrawer({
             onClose();
           }}
         />
+      )}
+
+      {showPrintKotModal && (
+        <PrintKotModal
+          orders={orders.filter((o) => o.status !== "cancelled")}
+          printKOT={printKotViaQz}
+          onClose={() => setShowPrintKotModal(false)}
+          onPrinted={(message) => showKotToast({ ok: true, message })}
+        />
+      )}
+
+      {/* Print KOT result toast — success auto-dismisses after 4s (see
+          showKotToast above); failures stay up until manually dismissed. */}
+      {kotNotice && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 20,
+            right: 20,
+            zIndex: 1100,
+            maxWidth: 340,
+            padding: "10px 14px",
+            borderRadius: 10,
+            background: kotNotice.ok ? "#EAF5EE" : "#FCEFE9",
+            border: `1px solid ${kotNotice.ok ? "#B9DEC5" : "#E9C6B4"}`,
+            boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
+            fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
+            fontSize: 12,
+            fontWeight: 600,
+            color: kotNotice.ok ? adminColors.success : "#8A3820",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 8,
+          }}
+        >
+          <span style={{ flex: 1 }}>{kotNotice.message}</span>
+          <button
+            onClick={() => setKotNotice(null)}
+            aria-label="Dismiss"
+            style={{ background: "transparent", border: "none", cursor: "pointer", color: "inherit", display: "flex", flexShrink: 0 }}
+          >
+            ×
+          </button>
+        </div>
       )}
     </Modal>
   );
