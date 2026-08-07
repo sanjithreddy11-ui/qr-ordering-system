@@ -119,6 +119,18 @@ const orderSchema = new mongoose.Schema(
     tableToken: { type: String, required: true },
     tableLabel: { type: String, default: null }, // resolved friendly name e.g. "Table 4"
 
+    // Daily Token Number System: a snapshot of the dining session's
+    // tokenNumber (see models/TableSession.js) at the moment this order was
+    // attached to it — kept here purely so KOT printing and the "new-order"
+    // broadcast (see services/orderService.js:finalizeOrder) never need an
+    // extra session lookup just to print a ticket. This can never drift
+    // from the session's own value: a session's tokenNumber is assigned
+    // exactly once, at session creation, and every order added to that
+    // session afterward is stamped with that same, already-final number —
+    // same reasoning as tableLabel above. Null for takeaway/counter orders
+    // that never attach to a table session.
+    tokenNumber: { type: Number, default: null },
+
     // Collected once at checkout. Optional so guest checkout keeps working;
     // used to power Customer analytics (see models/Customer.js) once an
     // order reaches "completed".

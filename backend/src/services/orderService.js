@@ -9,6 +9,7 @@ const ApiError = require("../utils/ApiError");
 const generateOrderId = require("../utils/generateOrderId");
 const generateTableSessionId = require("../utils/generateTableSessionId");
 const generateAdminSessionId = require("../utils/generateAdminSessionId");
+const createTableSessionWithToken = require("../utils/createTableSessionWithToken");
 const {
   emitNewOrder,
   emitTableOccupied,
@@ -92,13 +93,17 @@ function resolveLineModifiers(menuItem, requestedModifiers, itemLabel) {
 }
 
 // Table Management side effect, run after an order is successfully created:
-//   - if the table has no active TableSession, create one and mark the
-//     table Occupied (this is the FIRST order for this dining visit)
+//   - if the table has no active TableSession, create one (assigning the
+//     next Daily Token Number — see createTableSessionWithToken.js — since
+//     this is the FIRST order of the visit) and mark the table Occupied
 //   - if it already has one (from a previous order this visit, or from an
 //     admin Check-In), just attach this order and refresh the bill total
+//     — its tokenNumber is left untouched, exactly as assigned at creation
 // This never throws into the order-creation response — a failure here
 // should never block or roll back a successful order, since the customer
 // flow must keep working even if the table-management side is degraded.
+// Returns the resolved/created session (so finalizeOrder can stamp its
+// tokenNumber onto the order), or null if nothing could be resolved.
 async function syncTableOccupancyForOrder(table, order) {
   try {
     let session = table.currentSessionId
@@ -106,7 +111,7 @@ async function syncTableOccupancyForOrder(table, order) {
       : await TableSession.findOne({ tableId: table._id, status: "active" });
 
     if (!session) {
-      session = await TableSession.create({
+      session = await createTableSessionWithToken({
         sessionId: generateTableSessionId(),
         restaurantId: order.restaurantId,
         tableId: table._id,
@@ -163,8 +168,11 @@ async function syncTableOccupancyForOrder(table, order) {
         emitTableOccupied(table);
       }
     }
+
+    return session;
   } catch (err) {
     console.error("Table occupancy sync failed (order was still created):", err);
+    return null;
   }
 }
 
@@ -588,12 +596,25 @@ async function validateAndBuildAdminOrder(body, staff) {
 async function finalizeOrder(orderData) {
   const order = await Order.create(orderData);
 
-  emitNewOrder(order);
-
   const table = await Table.findOne({ token: order.tableToken });
+  let session = null;
   if (table) {
-    await syncTableOccupancyForOrder(table, order);
+    session = await syncTableOccupancyForOrder(table, order);
   }
+
+  // Daily Token Number System: stamp the session's token number onto this
+  // order (see Order.tokenNumber for why) before broadcasting it, so the
+  // "new-order" event auto-print listens for (KotAutoPrintProvider.tsx)
+  // already carries the number the ticket needs — no extra round-trip.
+  // Intentionally a no-op for takeaway/counter orders with no table
+  // session, and never overwrites with a stale value on failure (session
+  // is null if table-occupancy sync above failed or there's no table).
+  if (session?.tokenNumber != null) {
+    order.tokenNumber = session.tokenNumber;
+    await order.save();
+  }
+
+  emitNewOrder(order);
 
   await upsertCustomerFromOrder(order);
 

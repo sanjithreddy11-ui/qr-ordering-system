@@ -155,6 +155,7 @@ export default function PrintKotModal({
             orderType: order.orderType,
             placedAt: order.placedAt,
             specialInstructions: order.specialInstructions,
+            tokenNumber: order.tokenNumber,
             items: selectedItems,
           };
           const result = await printKOT(kot);

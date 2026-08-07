@@ -178,6 +178,7 @@ export default function CreateOrderFlow({
             orderType: order.orderType,
             placedAt: order.placedAt,
             specialInstructions: order.specialInstructions,
+            tokenNumber: order.tokenNumber,
             items: (order.items ?? []).map((line) => ({
               item: { name: line.item.name, categoryTitle: line.item.categoryTitle },
               quantity: line.quantity,

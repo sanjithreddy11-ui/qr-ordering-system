@@ -29,6 +29,25 @@ const tableSessionSchema = new mongoose.Schema(
     sessionStart: { type: Date, default: Date.now },
     sessionEnd: { type: Date, default: null },
 
+    // --- Daily Token Number System ---
+    // A small, human-readable queue number for this dining visit, shown on
+    // the Beverage/Kitchen Order Ticket header (see frontend
+    // lib/printer/kot.ts) so the kitchen/counter can call out an order
+    // without reading the table number aloud. Assigned exactly ONCE, at
+    // session-creation time (see utils/createTableSessionWithToken.js), and
+    // never touched again — every order added to this session later, and
+    // every KOT/reprint for any of those orders, reuses this same number.
+    // Resets to 1 automatically every business day because it's simply the
+    // highest tokenNumber already issued *for this restaurant on this
+    // businessDate*, plus one — there is no separate daily-reset job.
+    tokenNumber: { type: Number, default: null },
+    // The local business day (YYYY-MM-DD, see utils/getBusinessDate.js)
+    // this session's tokenNumber belongs to — the partition the "next
+    // token" lookup and the uniqueness index below both key off, so two
+    // sessions on different days can validly reuse the same tokenNumber
+    // while two sessions on the same day can never collide.
+    businessDate: { type: String, default: null },
+
     currentBill: { type: Number, default: 0 },
 
     status: { type: String, enum: ["active", "closed"], default: "active", index: true },
@@ -111,5 +130,18 @@ tableSessionSchema.index(
 // before, so every "Table Sessions" admin list load scanned + sorted in
 // memory.
 tableSessionSchema.index({ restaurantId: 1, status: 1, sessionStart: -1 });
+
+// Daily Token Number System: guarantees two sessions for the same
+// restaurant on the same business day can never end up with the same
+// tokenNumber, even if two "first orders" land at the exact same instant
+// on two different tables (see utils/createTableSessionWithToken.js, which
+// retries on the resulting duplicate-key error). Partial index — sessions
+// with no tokenNumber yet (there shouldn't be any, but this keeps the
+// index from ever rejecting a legitimate null) never enter the uniqueness
+// check.
+tableSessionSchema.index(
+  { restaurantId: 1, businessDate: 1, tokenNumber: 1 },
+  { unique: true, partialFilterExpression: { tokenNumber: { $type: "number" } } }
+);
 
 module.exports = mongoose.model("TableSession", tableSessionSchema);

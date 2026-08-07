@@ -5,6 +5,7 @@ const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
 const generateReservationId = require("../utils/generateReservationId");
 const generateTableSessionId = require("../utils/generateTableSessionId");
+const createTableSessionWithToken = require("../utils/createTableSessionWithToken");
 const {
   emitTableReserved,
   emitTableAvailable,
@@ -176,7 +177,12 @@ const checkInReservation = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Table already has an active session");
   }
 
-  const session = await TableSession.create({
+  // Daily Token Number System: Check-In starts a dining session exactly
+  // like a walk-in's first order does, so it gets its token number from
+  // the same shared helper (createTableSessionWithToken.js) — otherwise a
+  // reservation checked in between two walk-in orders could collide with,
+  // or skip, a token number.
+  const session = await createTableSessionWithToken({
     sessionId: generateTableSessionId(),
     restaurantId: reservation.restaurantId,
     tableId: table._id,

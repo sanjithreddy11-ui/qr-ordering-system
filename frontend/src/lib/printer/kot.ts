@@ -14,7 +14,20 @@
 // and a separate ticket — with its own heading — is built per printer from
 // only the items routed to it.
 
-import { columnsFor, divider, centerLine, sectionHeading, fieldRow, kotItemRows, modifierRows, specialInstructionRows, tableNumberOnly } from "./receiptLayout";
+import {
+  columnsFor,
+  divider,
+  doubleDivider,
+  centerLine,
+  sectionHeading,
+  fieldRow,
+  kotItemRows,
+  kotItemTableHeader,
+  modifierRows,
+  specialInstructionRows,
+  tableNumberOnly,
+  formatTokenNumber,
+} from "./receiptLayout";
 
 const ESC = "\x1B";
 const GS = "\x1D";
@@ -25,7 +38,12 @@ const CMD = {
   ALIGN_CENTER: `${ESC}a1`,
   BOLD_ON: `${ESC}E1`,
   BOLD_OFF: `${ESC}E0`,
-  DOUBLE_ON: `${GS}!\x11`, // double width + double height
+  DOUBLE_ON: `${GS}!\x11`, // double width + double height — the ticket title (largest)
+  // Medium size for the Table No. line: double HEIGHT only, normal width —
+  // deliberately between the title (double width+height) and the plain
+  // body text below (normal 1x1), per the "larger than the rest of the
+  // ticket but smaller than the title" header requirement.
+  MEDIUM_ON: `${GS}!\x01`,
   DOUBLE_OFF: `${GS}!\x00`,
   FEED: (lines: number) => `${ESC}d${String.fromCharCode(lines)}`,
   CUT: `${GS}V\x42\x00`, // partial cut, no extra feed
@@ -114,6 +132,13 @@ export interface KOTOrder {
   orderType: "dine-in" | "takeaway";
   placedAt: string;
   specialInstructions?: string;
+  // Daily Token Number System: the dining session's token number (see
+  // backend models/TableSession.js), assigned once when the session was
+  // created and identical for every order/KOT/reprint that session ever
+  // produces. Optional/absent for orders that predate this feature or have
+  // no table session (e.g. takeaway) — the header simply omits the Token
+  // No. row in that case, same pattern as the old tableLabel fallback.
+  tokenNumber?: number | string | null;
   items: {
     item: { name: string; categoryTitle?: string };
     quantity: number;
@@ -153,20 +178,40 @@ export function buildEscPosKOT(order: KOTOrder, role: KOTPrinterRole, items: KOT
   const cols = columnsFor(width);
 
   let out = CMD.INIT + CMD.ALIGN_CENTER;
-  out += CMD.BOLD_ON + CMD.DOUBLE_ON;
+
+  // ---- Ticket title — centered, bold, largest text on the ticket --------
+  out += CMD.BOLD_ON;
+  out += doubleDivider(cols) + "\n";
+  out += CMD.DOUBLE_ON;
   out += centerLine(KOT_HEADING[role], Math.floor(cols / 2)) + "\n";
+  out += CMD.DOUBLE_OFF;
+  out += doubleDivider(cols) + "\n";
+  out += CMD.BOLD_OFF;
+
+  // ---- Table No. — the primary identifier, centered directly below the
+  // title in a medium bold font (bigger than the body text below, smaller
+  // than the title above). Takeaway orders have no table to show, so this
+  // falls back to the order type instead — same "no table" case the old
+  // "Table :" row used to handle, just promoted into this same slot rather
+  // than dropped. ---------------------------------------------------------
+  out += CMD.BOLD_ON + CMD.MEDIUM_ON;
+  out += order.tableLabel
+    ? centerLine(`TABLE NO. ${tableNumberOnly(order.tableLabel)}`, cols) + "\n"
+    : centerLine(order.orderType === "dine-in" ? "DINE-IN" : "TAKEAWAY", cols) + "\n";
   out += CMD.DOUBLE_OFF + CMD.BOLD_OFF;
 
+  // ---- Token No. / Date / Time — normal font size, left-aligned fields --
   out += CMD.ALIGN_LEFT;
-  out += divider(cols) + "\n";
-  if (order.tableLabel) {
-    out += fieldRow("Table", tableNumberOnly(order.tableLabel), HEADER_LABEL_WIDTH) + "\n";
-  } else {
-    out += fieldRow("Type", order.orderType === "dine-in" ? "Dine-in" : "Takeaway", HEADER_LABEL_WIDTH) + "\n";
+  if (order.tokenNumber != null && order.tokenNumber !== "") {
+    out += fieldRow("Token No", formatTokenNumber(order.tokenNumber), HEADER_LABEL_WIDTH) + "\n";
   }
+  out += fieldRow("Date", new Date(order.placedAt).toLocaleDateString("en-IN"), HEADER_LABEL_WIDTH) + "\n";
   out += fieldRow("Time", new Date(order.placedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }), HEADER_LABEL_WIDTH) + "\n";
   out += divider(cols) + "\n";
 
+  // ---- Items table ---------------------------------------------------------
+  out += CMD.BOLD_ON + kotItemTableHeader(cols) + "\n" + CMD.BOLD_OFF;
+  out += divider(cols) + "\n";
   (items ?? []).forEach((line) => {
     out += CMD.BOLD_ON;
     kotItemRows(line.quantity, line.item.name, cols).forEach((row) => {

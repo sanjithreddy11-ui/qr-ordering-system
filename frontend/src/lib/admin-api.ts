@@ -314,6 +314,10 @@ export interface TableSessionData {
   printedAt: string | null;
   printedBy: string | null;
   printCount: number;
+  // Daily Token Number System: assigned once, at session creation, and
+  // unchanged for the life of the session — see backend models/TableSession.js.
+  tokenNumber?: number | null;
+  businessDate?: string | null;
   // Settlements Module: true once "Submit Bill" has locked this session's
   // bill into a Pending Settlement (see submitTableBill below).
   billSubmitted?: boolean;
@@ -929,6 +933,11 @@ export async function fetchCustomerOrderHistory(
 export interface RecentOrder {
   orderId: string;
   tableLabel?: string | null;
+  // Daily Token Number System: the dining session's token number, stamped
+  // onto the order at creation time — see backend models/Order.js. Null
+  // for takeaway/counter orders with no table session, or orders placed
+  // before this feature existed.
+  tokenNumber?: number | null;
   status: string;
   totalAmount: number;
   subtotal?: number;

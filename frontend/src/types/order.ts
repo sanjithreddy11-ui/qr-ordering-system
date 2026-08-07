@@ -42,6 +42,11 @@ export interface Order {
   restaurantId: string;
   tableToken: string;       // opaque token from QR code; backend resolves to real table
   tableLabel?: string | null;
+  // Daily Token Number System: the dining session's token number, stamped
+  // onto the order at creation time — see backend models/Order.js. Null
+  // for takeaway/counter orders with no table session, or orders placed
+  // before this feature existed.
+  tokenNumber?: number | null;
   customerName?: string;
   customerPhone?: string;
   items: OrderItem[];

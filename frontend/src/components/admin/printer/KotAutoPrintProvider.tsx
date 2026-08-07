@@ -98,6 +98,7 @@ export default function KotAutoPrintProvider({ children }: { children: React.Rea
         orderType: order.orderType,
         placedAt: order.placedAt,
         specialInstructions: order.specialInstructions,
+        tokenNumber: order.tokenNumber,
         items: order.items,
       };
 

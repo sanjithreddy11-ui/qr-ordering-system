@@ -158,6 +158,28 @@ export function itemTableHeader(cols: number): string {
 }
 
 /**
+ * Column header for the KOT item table ("Qty   Item") — no Amount column,
+ * same reasoning as kotItemRows below (the kitchen doesn't need to see
+ * money). Shares the same Qty column width as kotItemRows so the header
+ * and every item row line up under it.
+ */
+export function kotItemTableHeader(cols: number): string {
+  return "Qty".padEnd(QTY_WIDTH) + "Item";
+}
+
+/**
+ * Formats a Daily Token Number for display — zero-padded to 3 digits
+ * (e.g. "001", "042", "137") regardless of how large the underlying
+ * number is stored as. Shared by the KOT header and the bill/receipt so a
+ * session's token always reads identically everywhere it's printed.
+ */
+export function formatTokenNumber(tokenNumber: number | string): string {
+  const n = Number(tokenNumber);
+  if (!Number.isFinite(n)) return String(tokenNumber);
+  return String(n).padStart(3, "0");
+}
+
+/**
  * One item's row(s) in the item table. Long names wrap onto extra lines
  * (indented under the Item column) instead of being silently truncated,
  * so nothing important is ever lost off the edge of the paper.

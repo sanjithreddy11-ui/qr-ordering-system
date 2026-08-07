@@ -117,6 +117,11 @@ async function buildReceipt(table, session, staff) {
       printedAt: session.printedAt,
       printedBy: session.printedBy,
       printCount: session.printCount || 0,
+      // Daily Token Number System: same number as every KOT printed for
+      // this session (see models/TableSession.js) — populates the
+      // already-scaffolded, previously-unset `tokenNumber` field on the
+      // bill/receipt (see ThermalReceipt.tsx / lib/printer/escpos.ts).
+      tokenNumber: session.tokenNumber,
       appliedOffer: session.appliedOffer || null,
     },
     cashierName: staff?.name || "",
