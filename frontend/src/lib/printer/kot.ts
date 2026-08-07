@@ -14,7 +14,7 @@
 // and a separate ticket — with its own heading — is built per printer from
 // only the items routed to it.
 
-import { columnsFor, divider, centerLine, sectionHeading, fieldRow, kotItemRows, specialInstructionRows, tableNumberOnly } from "./receiptLayout";
+import { columnsFor, divider, centerLine, sectionHeading, fieldRow, kotItemRows, modifierRows, specialInstructionRows, tableNumberOnly } from "./receiptLayout";
 
 const ESC = "\x1B";
 const GS = "\x1D";
@@ -108,7 +108,17 @@ export interface KOTOrder {
   orderType: "dine-in" | "takeaway";
   placedAt: string;
   specialInstructions?: string;
-  items: { item: { name: string; categoryTitle?: string }; quantity: number }[];
+  items: {
+    item: { name: string; categoryTitle?: string };
+    quantity: number;
+    // Menu Item Customization (Modifiers): the selected sauce (or any
+    // future modifier) for this exact line, printed as indented bullets
+    // right under the item — see modifierRows in receiptLayout.ts. Two
+    // lines for the same item with different modifiers are never merged;
+    // each stays its own row in this array with its own quantity (see
+    // backend services/orderService.js validateAndBuildOrder).
+    modifiers?: { groupName: string; optionName: string }[];
+  }[];
 }
 
 export type KOTOrderItem = KOTOrder["items"][number];
@@ -151,13 +161,21 @@ export function buildEscPosKOT(order: KOTOrder, role: KOTPrinterRole, items: KOT
   out += fieldRow("Time", new Date(order.placedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }), HEADER_LABEL_WIDTH) + "\n";
   out += divider(cols) + "\n";
 
-  out += CMD.BOLD_ON;
   (items ?? []).forEach((line) => {
+    out += CMD.BOLD_ON;
     kotItemRows(line.quantity, line.item.name, cols).forEach((row) => {
       out += row + "\n";
     });
+    out += CMD.BOLD_OFF;
+    // Menu Item Customization (Modifiers): printed directly under the item
+    // they belong to, not bold — visually distinct from the dish name but
+    // still impossible for the kitchen to miss.
+    if (line.modifiers && line.modifiers.length > 0) {
+      modifierRows(line.modifiers, cols).forEach((row) => {
+        out += row + "\n";
+      });
+    }
   });
-  out += CMD.BOLD_OFF;
   out += divider(cols) + "\n";
 
   const instructionRows = order.specialInstructions?.trim() ? specialInstructionRows(order.specialInstructions, cols) : [];

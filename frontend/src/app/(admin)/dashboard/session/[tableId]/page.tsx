@@ -293,14 +293,23 @@ export default function DiningSessionPage() {
                 <span style={{ ...textStyle(13, 700) }}>{formatCurrency(o.totalAmount)}</span>
               </div>
               {o.items?.map((it, idx) => (
-                <div
-                  key={idx}
-                  style={{ display: "flex", justifyContent: "space-between", ...textStyle(12), color: adminColors.textSecondary }}
-                >
-                  <span>
-                    {it.quantity} {it.item.name}
-                  </span>
-                  <span>{formatCurrency(it.item.price * it.quantity)}</span>
+                <div key={idx} style={{ display: "flex", flexDirection: "column", gap: 1, marginBottom: 3 }}>
+                  <div
+                    style={{ display: "flex", justifyContent: "space-between", ...textStyle(12), color: adminColors.textSecondary }}
+                  >
+                    <span>
+                      {it.quantity} {it.item.name}
+                    </span>
+                    <span>{formatCurrency(it.item.price * it.quantity)}</span>
+                  </div>
+                  {/* Menu Item Customization (Modifiers): the selected
+                      sauce shown right under the item, in the Dining
+                      Session's full order history. */}
+                  {it.modifiers && it.modifiers.length > 0 && (
+                    <span style={{ ...textStyle(11), color: adminColors.textSecondary, paddingLeft: 12 }}>
+                      {it.modifiers.map((m) => `${m.groupName}: ${m.optionName}`).join(" · ")}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>

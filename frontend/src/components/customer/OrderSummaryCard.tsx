@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { CartEntry } from "@/store/cart-store";
+import { entryUnitPrice, type CartEntry } from "@/store/cart-store";
+import { cartEntryKey } from "@/lib/menu-data";
 
 interface Props {
   items: CartEntry[];
@@ -92,7 +93,7 @@ export default function OrderSummaryCard({
 
                     return (
                       <div
-                        key={entry.item.id}
+                        key={cartEntryKey(entry.item.id, entry.modifiers)}
                         className="flex items-center justify-between"
                       >
                         <div className="flex min-w-0 items-center gap-3">
@@ -117,6 +118,16 @@ export default function OrderSummaryCard({
                               {entry.item.name}
                             </p>
 
+                            {/* Menu Item Customization (Modifiers): kept
+                                visible through checkout, never dropped —
+                                same source (this cart entry) as the Cart
+                                page. */}
+                            {entry.modifiers && entry.modifiers.length > 0 ? (
+                              <p className="font-body text-xs text-text-secondary">
+                                {entry.modifiers.map((m) => m.optionName).join(", ")}
+                              </p>
+                            ) : null}
+
                             <p className="font-body text-xs text-text-secondary">
                               Qty: {entry.quantity}
                             </p>
@@ -125,7 +136,7 @@ export default function OrderSummaryCard({
 
                         <span className="font-body text-sm font-semibold text-text-primary">
                           ₹{" "}
-                          {entry.item.price *
+                          {entryUnitPrice(entry) *
                             entry.quantity}
                         </span>
                       </div>

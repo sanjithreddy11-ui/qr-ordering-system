@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { Minus, Plus } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CartEntry, useCartStore } from "@/store/cart-store";
+import { CartEntry, entryUnitPrice, useCartStore } from "@/store/cart-store";
 
 interface Props {
   entry: CartEntry;
@@ -14,8 +14,9 @@ const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 export default function CartItemCard({ entry }: Props) {
   const { addItem, removeItem } = useCartStore();
 
-  const { item, quantity } = entry;
+  const { item, quantity, modifiers } = entry;
   const isVeg = item.diet === "veg";
+  const unitPrice = entryUnitPrice(entry);
 
   return (
     <motion.div
@@ -68,15 +69,33 @@ export default function CartItemCard({ entry }: Props) {
             </h3>
           </div>
 
-          <p className="font-body mt-1 line-clamp-2 text-[13px] leading-snug text-text-secondary">
-            {item.description}
-          </p>
+          {/* Menu Item Customization (Modifiers): the selected sauce shown
+              right under the item name, so it's always visible while the
+              cart is reviewed — preserved even as the quantity changes,
+              since it lives on this exact cart entry, not derived from
+              elsewhere. */}
+          {modifiers && modifiers.length > 0 ? (
+            <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+              {modifiers.map((m) => (
+                <li
+                  key={m.groupId}
+                  className="font-body text-[13px] leading-snug text-text-secondary"
+                >
+                  • {m.optionName}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="font-body mt-1 line-clamp-2 text-[13px] leading-snug text-text-secondary">
+              {item.description}
+            </p>
+          )}
         </div>
 
         {/* Bottom */}
         <div className="mt-3 flex items-end justify-between">
           <span className="font-body text-[18px] font-bold text-text-primary">
-            ₹ {item.price * quantity}
+            ₹ {unitPrice * quantity}
           </span>
 
           <AnimatePresence mode="wait">
@@ -89,7 +108,7 @@ export default function CartItemCard({ entry }: Props) {
             >
               <motion.button
                 whileTap={{ scale: 0.85 }}
-                onClick={() => removeItem(item)}
+                onClick={() => removeItem(item, modifiers)}
                 className="flex h-6 w-6 items-center justify-center text-green-primary"
               >
                 <Minus size={14} strokeWidth={2.3} />
@@ -101,7 +120,7 @@ export default function CartItemCard({ entry }: Props) {
 
               <motion.button
                 whileTap={{ scale: 0.85 }}
-                onClick={() => addItem(item)}
+                onClick={() => addItem(item, modifiers)}
                 className="flex h-6 w-6 items-center justify-center text-green-primary"
               >
                 <Plus size={14} strokeWidth={2.3} />

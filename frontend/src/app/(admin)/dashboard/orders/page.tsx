@@ -304,6 +304,21 @@ function OrderDetailsModal({
                   </span>
                   <span style={{ color: adminColors.textSecondary, flexShrink: 0 }}>₹ {line.item.price * line.quantity}</span>
                 </div>
+                {/* Menu Item Customization (Modifiers): so restaurant staff
+                    immediately know which sauce (or any future modifier)
+                    the customer selected for this exact line. */}
+                {line.modifiers && line.modifiers.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingLeft: 4 }}>
+                    {line.modifiers.map((m) => (
+                      <span
+                        key={m.groupId}
+                        style={{ fontFamily: bodyFont, fontSize: 12, color: adminColors.textSecondary }}
+                      >
+                        {m.groupName}: <span style={{ fontWeight: 600, color: adminColors.text }}>{m.optionName}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                   <ItemStatusBadge status={itemStatus} />
                   {!orderFinalized && !itemFinalized && (

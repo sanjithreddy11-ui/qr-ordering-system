@@ -1,4 +1,4 @@
-import type { MenuItem } from "@/lib/menu-data";
+import type { MenuItem, SelectedModifier } from "@/lib/menu-data";
 export type PaymentMethod = "upi" | "cash" | "card";
 
 export type OrderStatus = "pending" | "preparing" | "ready" | "completed" | "cancelled";
@@ -21,6 +21,11 @@ export interface OrderItem {
   // lib/admin-api.ts:orderItemLineKey for the array-index fallback used
   // when it's missing (pre-existing orders).
   lineId?: string;
+  // Menu Item Customization (Modifiers): the selected sauce (or any future
+  // modifier) for this exact line — absent/[] for a non-customizable item,
+  // or any order placed before this feature existed. See
+  // lib/menu-data.ts:SelectedModifier.
+  modifiers?: SelectedModifier[];
 }
 
 export interface CheckoutForm {

@@ -1,5 +1,36 @@
 export type Diet = "veg" | "non-veg";
 
+// Menu Item Customization (Modifiers): a generic, reusable modifier group
+// attached to a menu item — nothing here is specific to sauces, so the
+// same shape covers any future modifier (spice level, size, add-ons)
+// without a frontend code change. Mirrors backend models/MenuItem.js.
+export interface ModifierOption {
+  id: string;
+  name: string;
+  /** Extra unit price for choosing this option. 0 for every sauce today. */
+  priceDelta: number;
+}
+
+export interface ModifierGroup {
+  id: string;
+  name: string;
+  required: boolean;
+  /** "single" = radio buttons (pick exactly one). "multiple" = checkboxes. */
+  selectionType: "single" | "multiple";
+  options: ModifierOption[];
+}
+
+// The customer's chosen option(s) for one modifier group, both while still
+// in the cart and after being snapshotted onto an order line. Mirrors
+// backend models/Order.js orderItemModifierSchema.
+export interface SelectedModifier {
+  groupId: string;
+  groupName: string;
+  optionId: string;
+  optionName: string;
+  priceDelta: number;
+}
+
 export interface MenuItem {
   id: string;
   name: string;
@@ -7,12 +38,39 @@ export interface MenuItem {
   price: number;
   diet: Diet;
   image: string;
+  // Menu Item Customization (Modifiers): absent for a plain item — loaded
+  // dynamically from the database via GET /api/menu/:restaurantId, never
+  // hardcoded in any frontend component. See components/customer/
+  // ModifierModal.tsx and store/cart-store.ts for where this drives the
+  // "required sauce" flow.
+  modifierGroups?: ModifierGroup[];
 }
 
 export interface MenuCategory {
   id: string;
   title: string;
   items: MenuItem[];
+}
+
+// Menu Item Customization (Modifiers): true when this item has at least
+// one required modifier group (e.g. Sauce) — the single source of truth
+// for "does adding this item need the customization modal first",
+// used by FoodCard/menu page and CartItemCard so neither ever hardcodes
+// a specific item name/id to decide this.
+export function requiresCustomization(item: MenuItem): boolean {
+  return Boolean(item.modifierGroups?.some((g) => g.required));
+}
+
+// A stable, order-independent key identifying one cart entry: the item id
+// plus its exact selected modifiers. Two entries for the same menu item
+// with different modifiers (e.g. Red Sauce vs Mixed Sauce) get different
+// keys, so they're tracked as separate cart lines rather than merged.
+export function cartEntryKey(itemId: string, modifiers?: SelectedModifier[]): string {
+  const modifierPart = (modifiers ?? [])
+    .map((m) => `${m.groupId}:${m.optionId}`)
+    .sort()
+    .join("|");
+  return modifierPart ? `${itemId}::${modifierPart}` : itemId;
 }
 
 export const menu: MenuCategory[] = [

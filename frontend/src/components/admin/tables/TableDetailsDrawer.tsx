@@ -22,6 +22,7 @@ import {
   type RecentOrder,
   type ReceiptData,
   type Offer,
+  type SelectedOrderModifier,
 } from "@/lib/admin-api";
 import { statusMeta, formatCurrency, formatTime } from "./tableStatus";
 import { TablePrimaryButton } from "./tableButtons";
@@ -68,22 +69,37 @@ function overallOrderStatus(orders: RecentOrder[]) {
   return worst;
 }
 
+// Menu Item Customization (Modifiers): a stable key for a line's selected
+// options, order-independent, so grouping never depends on the order the
+// customer happened to tap options in.
+function modifierKey(modifiers?: SelectedOrderModifier[]): string {
+  return (modifiers ?? [])
+    .map((m) => `${m.groupId}:${m.optionId}`)
+    .sort()
+    .join("|");
+}
+
 // Line items for the "Ordered Items" section — every item across every
-// order in the session, quantities for the same item/price summed
-// together (so a Cappuccino ordered twice shows as one "2 x Cappuccino"
-// row with its combined line total), sourced from the receipt payload so
-// the popup's item list always matches what gets printed.
+// order in the session, quantities for the same item/price/modifiers
+// summed together (so a Cappuccino ordered twice shows as one "2 x
+// Cappuccino" row with its combined line total), sourced from the receipt
+// payload so the popup's item list always matches what gets printed.
+//
+// Menu Item Customization (Modifiers): two lines for the same menu item
+// with DIFFERENT selected modifiers (e.g. Red Sauce vs Mixed Sauce) are
+// deliberately kept separate — never summed into one row — same rule as
+// the KOT (see lib/printer/kot.ts).
 function aggregateReceiptItems(receipt: ReceiptData | null) {
   if (!receipt) return [];
-  const byKey = new Map<string, { name: string; price: number; quantity: number }>();
+  const byKey = new Map<string, { name: string; price: number; quantity: number; modifiers: SelectedOrderModifier[] }>();
   for (const order of receipt.orders) {
     for (const it of order.items) {
-      const key = `${it.name}__${it.price}`;
+      const key = `${it.name}__${it.price}__${modifierKey(it.modifiers)}`;
       const existing = byKey.get(key);
       if (existing) {
         existing.quantity += it.quantity;
       } else {
-        byKey.set(key, { name: it.name, price: it.price, quantity: it.quantity });
+        byKey.set(key, { name: it.name, price: it.price, quantity: it.quantity, modifiers: it.modifiers ?? [] });
       }
     }
   }
@@ -336,6 +352,7 @@ export default function TableDetailsDrawer({
             items: (order.items ?? []).map((line) => ({
               item: { name: line.item.name, categoryTitle: line.item.categoryTitle },
               quantity: line.quantity,
+              modifiers: line.modifiers,
             })),
           };
           const result: KotPrintResult = await printKotViaQz(kot);
@@ -551,12 +568,22 @@ export default function TableDetailsDrawer({
               <p style={{ ...bodyText(12), color: adminColors.textSecondary, margin: 0 }}>No orders yet.</p>
             )}
             {items.map((line) => (
-              <div key={`${line.name}-${line.price}`} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                <span style={{ ...bodyText(12), color: adminColors.text }}>
-                  {line.quantity} × {line.name}
-                  <span style={{ color: adminColors.textSecondary }}> ({formatCurrency(line.price)} each)</span>
-                </span>
-                <span style={{ ...bodyText(12, 700) }}>{formatCurrency(line.price * line.quantity)}</span>
+              <div
+                key={`${line.name}-${line.price}-${modifierKey(line.modifiers)}`}
+                style={{ display: "flex", flexDirection: "column", gap: 2 }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                  <span style={{ ...bodyText(12), color: adminColors.text }}>
+                    {line.quantity} × {line.name}
+                    <span style={{ color: adminColors.textSecondary }}> ({formatCurrency(line.price)} each)</span>
+                  </span>
+                  <span style={{ ...bodyText(12, 700) }}>{formatCurrency(line.price * line.quantity)}</span>
+                </div>
+                {line.modifiers.length > 0 && (
+                  <span style={{ ...bodyText(11), color: adminColors.textSecondary, paddingLeft: 14 }}>
+                    {line.modifiers.map((m) => `${m.groupName}: ${m.optionName}`).join(" · ")}
+                  </span>
+                )}
               </div>
             ))}
           </Section>

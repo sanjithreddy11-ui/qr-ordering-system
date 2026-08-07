@@ -50,7 +50,12 @@ export interface PlaceOrderPayload {
   sessionId: string;
   restaurantId: string;
   tableToken: string;
-  items: { id: string; quantity: number }[];
+  // Menu Item Customization (Modifiers): `modifiers` mirrors exactly what
+  // the backend validates against the menu item's own modifierGroups (see
+  // backend/src/services/orderService.js:resolveLineModifiers) — one entry
+  // per group the customer made a selection in. Omitted entirely for a
+  // plain (non-customizable) item, same as before this feature existed.
+  items: { id: string; quantity: number; modifiers?: { groupId: string; optionIds: string[] }[] }[];
   orderType: "dine-in" | "takeaway";
   specialInstructions: string;
   paymentMethod: PaymentMethod;

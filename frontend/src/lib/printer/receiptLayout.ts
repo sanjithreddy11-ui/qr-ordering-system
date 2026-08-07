@@ -187,6 +187,28 @@ export function kotItemRows(qty: number, name: string, cols: number): string[] {
 }
 
 /**
+ * Menu Item Customization (Modifiers): one indented bullet line per
+ * selected modifier under a KOT item, e.g. "  • Sauce: Red Sauce" — so the
+ * kitchen always knows exactly which sauce (or any future modifier) this
+ * exact line needs, never just the item name. Indented under the Qty
+ * column (same width) so it visually nests under the item it belongs to.
+ * Long "Group: Option" text wraps like any other KOT text rather than
+ * truncating.
+ */
+export function modifierRows(modifiers: { groupName: string; optionName: string }[], cols: number): string[] {
+  const BULLET = "\u2022 "; // "• "
+  const indent = " ".repeat(QTY_WIDTH + 1);
+  const bulletWidth = Math.max(8, cols - indent.length - BULLET.length);
+
+  return modifiers.flatMap(({ groupName, optionName }) => {
+    const text = `${groupName}: ${optionName}`;
+    return wrapWords(text, bulletWidth).map((seg, i) =>
+      i === 0 ? `${indent}${BULLET}${seg}` : `${indent}${" ".repeat(BULLET.length)}${seg}`
+    );
+  });
+}
+
+/**
  * Formats the customer's checkout "Special Instructions" free text as a
  * bulleted list for the KOT. Each line the customer actually typed (their
  * own line breaks in the textarea) becomes its own bullet, so their

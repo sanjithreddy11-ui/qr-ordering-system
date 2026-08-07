@@ -4,6 +4,7 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useCartStore } from "@/store/cart-store";
+import { cartEntryKey } from "@/lib/menu-data";
 import { useBuildCustomerUrl } from "@/lib/customer-nav";
 import CartItemCard from "@/components/customer/CartItemCard";
 import BillSummary from "@/components/customer/BillSummary";
@@ -100,7 +101,7 @@ export default function CartPage() {
   }}
 >
   {items.map((entry) => (
-    <CartItemCard key={entry.item.id} entry={entry} />
+    <CartItemCard key={cartEntryKey(entry.item.id, entry.modifiers)} entry={entry} />
   ))}
 </div>
 

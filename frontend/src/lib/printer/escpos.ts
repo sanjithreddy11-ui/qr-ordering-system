@@ -22,6 +22,7 @@ import {
   fieldRow,
   itemTableHeader,
   itemRows,
+  modifierRows,
   capitalize,
   tableNumberOnly,
 } from "./receiptLayout";
@@ -99,6 +100,14 @@ export async function buildEscPosReceipt(receipt: ReceiptData, width: 58 | 80 = 
       itemRows(it.quantity, it.name, money(it.price * it.quantity), cols).forEach((line) => {
         out += line + "\n";
       });
+      // Menu Item Customization (Modifiers): printed under the line it
+      // belongs to, e.g. "Red Sauce" under "Chicken Penne Pasta" — see
+      // the "Billing" requirement this satisfies.
+      if (it.modifiers && it.modifiers.length > 0) {
+        modifierRows(it.modifiers, cols).forEach((line) => {
+          out += line + "\n";
+        });
+      }
     });
   });
   out += divider(cols) + "\n";
@@ -163,7 +172,13 @@ export interface SingleOrderForPrint {
   // Item-Level Order Management: a cancelled item is excluded below since
   // subtotal/taxAmount/totalAmount are now recomputed to exclude it too —
   // printing it as a full-price line would no longer match the totals.
-  items?: { item: { name: string; price: number }; quantity: number; status?: string }[];
+  items?: {
+    item: { name: string; price: number };
+    quantity: number;
+    status?: string;
+    // Menu Item Customization (Modifiers)
+    modifiers?: { groupName: string; optionName: string }[];
+  }[];
   subtotal?: number;
   taxAmount?: number;
   totalAmount: number;
@@ -204,6 +219,11 @@ export function buildEscPosOrderReceipt(
       itemRows(line.quantity, line.item.name, money(line.item.price * line.quantity), cols).forEach((row) => {
         out += row + "\n";
       });
+      if (line.modifiers && line.modifiers.length > 0) {
+        modifierRows(line.modifiers, cols).forEach((row) => {
+          out += row + "\n";
+        });
+      }
     });
   out += divider(cols) + "\n";
 

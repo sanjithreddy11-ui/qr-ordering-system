@@ -61,6 +61,35 @@ export async function adminLogin(
 
 // ---------- Menu ----------
 
+// Menu Item Customization (Modifiers): mirrors backend models/MenuItem.js
+// modifierGroupSchema/modifierOptionSchema. Generic — nothing here is
+// specific to sauces — so any future modifier group (spice level, size,
+// add-ons) uses the exact same shape.
+export interface AdminModifierOption {
+  id: string;
+  name: string;
+  priceDelta: number;
+}
+
+export interface AdminModifierGroup {
+  id: string;
+  name: string;
+  required: boolean;
+  selectionType: "single" | "multiple";
+  options: AdminModifierOption[];
+}
+
+// Menu Item Customization (Modifiers): the selected option(s) snapshotted
+// onto an order line — mirrors backend models/Order.js
+// orderItemModifierSchema.
+export interface SelectedOrderModifier {
+  groupId: string;
+  groupName: string;
+  optionId: string;
+  optionName: string;
+  priceDelta: number;
+}
+
 export interface AdminMenuItem {
   id: string;
   restaurantId: string;
@@ -80,6 +109,8 @@ export interface AdminMenuItem {
   // the Menu Management item form.
   gstSlab: number | null;
   hsnCode: string;
+  // Menu Item Customization (Modifiers): absent/[] for a plain item.
+  modifierGroups?: AdminModifierGroup[];
 }
 
 export interface MenuItemsPage {
@@ -342,7 +373,7 @@ export interface ReceiptData {
     orderId: string;
     placedAt: string;
     status?: string;
-    items: { name: string; price: number; quantity: number }[];
+    items: { name: string; price: number; quantity: number; modifiers?: SelectedOrderModifier[] }[];
     subtotal: number;
     taxAmount: number;
     totalAmount: number;
@@ -916,6 +947,11 @@ export interface RecentOrder {
     item: { id: string; name: string; price: number; categoryTitle?: string };
     quantity: number;
     notes?: string;
+    // Menu Item Customization (Modifiers): the selected sauce (or any
+    // future modifier) for this exact line — absent/[] for a
+    // non-customizable item, or any order placed before this feature
+    // existed.
+    modifiers?: SelectedOrderModifier[];
     // Defaults to "pending" on the backend for any line that predates this
     // field, so a missing value here should be treated the same way.
     status?: "pending" | "preparing" | "ready" | "completed" | "cancelled";

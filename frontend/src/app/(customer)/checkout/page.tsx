@@ -85,7 +85,19 @@ export default function CheckoutPage() {
       sessionId,
       restaurantId,
       tableToken,
-      items: items.map((e) => ({ id: e.item.id, quantity: e.quantity })),
+      // Menu Item Customization (Modifiers): each cart entry's selected
+      // modifiers, grouped back into { groupId, optionIds } — the shape
+      // the backend validates against the menu item's own modifierGroups
+      // (see backend/src/services/orderService.js:resolveLineModifiers).
+      // Omitted for a plain item (entry.modifiers is undefined/empty).
+      items: items.map((e) => ({
+        id: e.item.id,
+        quantity: e.quantity,
+        modifiers:
+          e.modifiers && e.modifiers.length > 0
+            ? e.modifiers.map((m) => ({ groupId: m.groupId, optionIds: [m.optionId] }))
+            : undefined,
+      })),
       orderType: form.orderType,
       specialInstructions: form.specialInstructions,
       paymentMethod: form.paymentMethod,

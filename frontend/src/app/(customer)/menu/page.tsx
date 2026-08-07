@@ -12,7 +12,8 @@ import FoodCard from "@/components/customer/FoodCard";
 import FloatingCart from "@/components/customer/FloatingCart";
 import CategoryDrawer from "@/components/customer/CategoryDrawer";
 import WaiterCallButton from "@/components/customer/WaiterCallButton";
-import { menu as mockMenu, type MenuItem, type MenuCategory } from "@/lib/menu-data";
+import ModifierModal from "@/components/customer/ModifierModal";
+import { menu as mockMenu, requiresCustomization, type MenuItem, type MenuCategory, type SelectedModifier } from "@/lib/menu-data";
 import { useCartStore } from "@/store/cart-store";
 import { useSessionStore } from "@/store/session-store";
 import { useCustomerNavigate } from "@/lib/customer-nav";
@@ -36,6 +37,10 @@ export default function MenuPage() {
   const [liveMenu, setLiveMenu] = useState<MenuCategory[] | null>(null);
   const [menuLoading, setMenuLoading] = useState(true);
   const [tableLabel, setTableLabel] = useState<string | null>(null);
+  // Menu Item Customization (Modifiers): the item currently open in the
+  // customization modal, or null when it's closed. Set by handleAdd
+  // whenever a customizable item's "+" is tapped — see FoodCard.tsx.
+  const [modalItem, setModalItem] = useState<MenuItem | null>(null);
 
   const {
     items,
@@ -126,7 +131,24 @@ export default function MenuPage() {
 
   const handleAdd = useCallback(
     (item: MenuItem) => {
-      addItem(item, restaurantId, tableToken ?? undefined);
+      // Menu Item Customization (Modifiers): a customizable item is NEVER
+      // added directly — the "+" always opens the required-selection
+      // modal first (see ModifierModal.tsx), no matter how many are
+      // already in the cart. A plain item still adds straight to cart,
+      // completely unchanged from before this feature existed.
+      if (requiresCustomization(item)) {
+        setModalItem(item);
+        return;
+      }
+      addItem(item, undefined, restaurantId, tableToken ?? undefined);
+    },
+    [addItem, restaurantId, tableToken]
+  );
+
+  const handleConfirmModifiers = useCallback(
+    (item: MenuItem, modifiers: SelectedModifier[]) => {
+      addItem(item, modifiers, restaurantId, tableToken ?? undefined);
+      setModalItem(null);
     },
     [addItem, restaurantId, tableToken]
   );
@@ -236,8 +258,14 @@ export default function MenuPage() {
               <div className="flex flex-col gap-4 pb-8">
                 {category.items.map(
                   (item, itemIdx) => {
-                    const quantity =
-                      items.find((e) => e.item.id === item.id)?.quantity ?? 0;
+                    // Menu Item Customization (Modifiers): a customizable
+                    // item can have several cart lines at once (one per
+                    // sauce chosen) — sum across all of them for the
+                    // badge shown on this card, rather than only finding
+                    // the first matching entry.
+                    const quantity = items
+                      .filter((e) => e.item.id === item.id)
+                      .reduce((sum, e) => sum + e.quantity, 0);
 
                     return (
                       <FoodCard
@@ -268,6 +296,12 @@ export default function MenuPage() {
       <FloatingCart
         itemCount={totalItems()}
         total={subtotal()}
+      />
+
+      <ModifierModal
+        item={modalItem}
+        onCancel={() => setModalItem(null)}
+        onConfirm={handleConfirmModifiers}
       />
     </main>
   );

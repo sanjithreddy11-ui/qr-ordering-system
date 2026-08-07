@@ -18,6 +18,7 @@ import {
   fieldRow,
   itemTableHeader,
   itemRows,
+  modifierRows,
   capitalize,
   tableNumberOnly,
 } from "@/lib/printer/receiptLayout";
@@ -243,6 +244,12 @@ function ReceiptBody({ receipt, width }: { receipt: ReceiptData; width: 58 | 80 
   orders.forEach((o) => {
     o.items.forEach((it) => {
       itemRows(it.quantity, it.name, money(it.price * it.quantity), cols).forEach((row) => push(row));
+      // Menu Item Customization (Modifiers): shown in the on-screen
+      // preview exactly as it will print — same helper, same source data,
+      // as buildEscPosReceipt in lib/printer/escpos.ts.
+      if (it.modifiers && it.modifiers.length > 0) {
+        modifierRows(it.modifiers, cols).forEach((row) => push(row));
+      }
     });
   });
   push(divider(cols));
