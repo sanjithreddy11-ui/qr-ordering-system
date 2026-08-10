@@ -695,15 +695,37 @@ async function recalculateDownstreamForOrder(order) {
   // orders it currently rolls up, the same way syncTableOccupancyForOrder /
   // deleteOrderCascade maintain it. ---
   try {
-    const sessions = await TableSession.find({ orderIds: orderId });
-    for (const session of sessions) {
-      const sessionOrders = await Order.find({ orderId: { $in: session.orderIds } });
-      session.currentBill = sessionOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+  const sessions = await TableSession.find({ orderIds: orderId });
+  for (const session of sessions) {
+    const sessionOrders = await Order.find({ orderId: { $in: session.orderIds } });
+    session.currentBill = sessionOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+    await session.save();
+
+    // NEW: if every order in this session is now cancelled/zero, the table
+    // isn't really occupied anymore — free it, same as deleteOrderCascade.
+    const stillActive = sessionOrders.some(
+      (o) => o.status !== "cancelled" && o.totalAmount > 0
+    );
+    if (!stillActive && session.status === "active") {
+      session.status = "closed";
+      session.sessionEnd = new Date();
       await session.save();
+      emitSessionEnded(session);
+
+      const table = await Table.findById(session.tableId);
+      if (table && table.currentSessionId === session.sessionId) {
+        table.status = "available";
+        table.currentSessionId = null;
+        table.currentReservationId = null;
+        table.occupiedAt = null;
+        await table.save();
+        emitTableAvailable(table);
+      }
     }
-  } catch (err) {
-    console.error("TableSession currentBill recompute failed (item status change was still applied):", err);
   }
+} catch (err) {
+  console.error("TableSession currentBill recompute failed (item status change was still applied):", err);
+}
 
   // --- Settlements Module: if this order was already billed under a
   // Settlement (Submit Bill already ran), keep subtotal/tax/grandTotal in
