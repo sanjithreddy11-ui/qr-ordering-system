@@ -75,6 +75,7 @@ const COUNTER_CATEGORIES = [
   "Mojitos",
   "Shakes",
   "Water Bottle",
+  "Desserts",
 ];
 
 const KITCHEN_CATEGORIES = [
@@ -87,7 +88,6 @@ const KITCHEN_CATEGORIES = [
   "Large Plate",
   "Pasta",
   "Salads",
-  "Desserts",
   "Small Bites",
   "Add Ons",
 ];
