@@ -45,7 +45,7 @@ function buildSelectableItems(orders: RecentOrder[]): SelectableKotItem[] {
   const rows: SelectableKotItem[] = [];
   for (const order of orders) {
     (order.items ?? []).forEach((line, index) => {
-      const printerRole = resolvePrinterRole(line.item.categoryTitle);
+      const printerRole = resolvePrinterRole(line.item);
       rows.push({
         id: `${order.orderId}::${orderItemLineKey(line, index)}`,
         orderId: order.orderId,
@@ -53,7 +53,7 @@ function buildSelectableItems(orders: RecentOrder[]): SelectableKotItem[] {
         quantity: line.quantity,
         printerRole,
         kotItem: {
-          item: { name: line.item.name, categoryTitle: line.item.categoryTitle },
+          item: { id: line.item.id, name: line.item.name, categoryTitle: line.item.categoryTitle },
           quantity: line.quantity,
           modifiers: line.modifiers,
         },

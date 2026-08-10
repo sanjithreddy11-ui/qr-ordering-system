@@ -101,9 +101,31 @@ function normalizeCategory(categoryTitle: string): string {
 const COUNTER_CATEGORY_SET = new Set(COUNTER_CATEGORIES.map(normalizeCategory));
 const KITCHEN_CATEGORY_SET = new Set(KITCHEN_CATEGORIES.map(normalizeCategory));
 
+// Item-level override: Chocolate Waffle and Nutella Waffle live in the
+// Desserts category (which otherwise routes to the Counter Printer), but
+// both need to be cooked on the waffle iron, so they must still print on
+// the Kitchen Printer. Every other Desserts item continues to print on the
+// Counter Printer as normal — this is a narrow, explicit two-item
+// exception, not a change to Desserts' category routing.
+//
+// Keyed primarily by the menu item's stable `id` (survives renames/re-seeds
+// as long as the id itself is unchanged), with a normalized-name fallback
+// for the rare case a KOT line is missing its id (e.g. an older order
+// snapshot predating the `id` field on order lines).
+const KITCHEN_OVERRIDE_ITEM_IDS = new Set(["chocolate-waffle", "nutella-waffle"]);
+const KITCHEN_OVERRIDE_ITEM_NAMES = new Set(["Chocolate Waffle", "Nutella Waffle"].map(normalizeCategory));
+
+function isKitchenOverrideItem(item: { id?: string; name?: string } | undefined): boolean {
+  const id = item?.id?.trim().toLowerCase();
+  if (id) return KITCHEN_OVERRIDE_ITEM_IDS.has(id);
+  return KITCHEN_OVERRIDE_ITEM_NAMES.has(normalizeCategory(item?.name ?? ""));
+}
+
 /**
- * Resolves which printer a single order line belongs on, based on its
- * category — never on the item's name or id.
+ * Resolves which printer a single order line belongs on — primarily by
+ * category, with a narrow item-level override (see
+ * KITCHEN_OVERRIDE_ITEM_IDS above) for the handful of items that need to
+ * print on a different printer than the rest of their category.
  *
  * A category that matches neither list (e.g. a brand-new menu category
  * created before this routing table is updated) falls back to the Kitchen
@@ -116,8 +138,10 @@ const KITCHEN_CATEGORY_SET = new Set(KITCHEN_CATEGORIES.map(normalizeCategory));
  * decision `splitKOTItemsByPrinter`/`buildEscPosKOT` will use, instead of
  * re-deriving it. Never call this to change routing; it's read-only.
  */
-export function resolvePrinterRole(categoryTitle: string | undefined): KOTPrinterRole {
-  const key = normalizeCategory(categoryTitle ?? "");
+export function resolvePrinterRole(item: { id?: string; name?: string; categoryTitle?: string } | undefined): KOTPrinterRole {
+  if (isKitchenOverrideItem(item)) return "kitchen";
+
+  const key = normalizeCategory(item?.categoryTitle ?? "");
   if (COUNTER_CATEGORY_SET.has(key)) return "counter";
   if (KITCHEN_CATEGORY_SET.has(key)) return "kitchen";
   return "kitchen";
@@ -140,7 +164,7 @@ export interface KOTOrder {
   // No. row in that case, same pattern as the old tableLabel fallback.
   tokenNumber?: number | string | null;
   items: {
-    item: { name: string; categoryTitle?: string };
+    item: { id?: string; name: string; categoryTitle?: string };
     quantity: number;
     // Menu Item Customization (Modifiers): the selected sauce (or any
     // future modifier) for this exact line, printed as indented bullets
@@ -162,7 +186,7 @@ export type KOTOrderItem = KOTOrder["items"][number];
 export function splitKOTItemsByPrinter(items: KOTOrderItem[]): Record<KOTPrinterRole, KOTOrderItem[]> {
   const split: Record<KOTPrinterRole, KOTOrderItem[]> = { kitchen: [], counter: [] };
   for (const line of items ?? []) {
-    split[resolvePrinterRole(line.item.categoryTitle)].push(line);
+    split[resolvePrinterRole(line.item)].push(line);
   }
   return split;
 }
