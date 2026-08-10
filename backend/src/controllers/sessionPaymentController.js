@@ -129,16 +129,28 @@ async function buildReceipt(table, session, staff) {
       orderId: o.orderId,
       placedAt: o.placedAt,
       status: o.status,
+      // Item-Level Order Management: a cancelled line is already excluded
+      // from this order's subtotal/taxAmount/totalAmount (re-summed from
+      // only the remaining lines — see orderService.js), but until now it
+      // was still being listed here, so the bill preview/print showed a
+      // line item whose price wasn't actually being charged. Cancelled
+      // items stay fully visible with their CANCELLED status on the Orders
+      // dashboard (adminOrderController.js/Orders page) — this filter only
+      // affects what the bill (ThermalReceipt.tsx, lib/printer/escpos.ts)
+      // is built from, so both surfaces stay in sync automatically.
+      //
       // Menu Item Customization (Modifiers): carried through onto the
       // printed/on-screen bill so a customized line (e.g. "Chicken Penne
       // Pasta — Red Sauce") never shows as indistinguishable from a plain
       // one — see lib/printer/escpos.ts and ThermalReceipt.tsx.
-      items: o.items.map((i) => ({
-        name: i.item.name,
-        price: i.item.price,
-        quantity: i.quantity,
-        modifiers: i.modifiers || [],
-      })),
+      items: o.items
+        .filter((i) => i.status !== "cancelled")
+        .map((i) => ({
+          name: i.item.name,
+          price: i.item.price,
+          quantity: i.quantity,
+          modifiers: i.modifiers || [],
+        })),
       subtotal: o.subtotal,
       taxAmount: o.taxAmount,
       totalAmount: o.totalAmount,
