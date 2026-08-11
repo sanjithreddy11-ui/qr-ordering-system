@@ -109,6 +109,7 @@ export default function CreateOrderFlow({
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const printKotViaQz = usePrinterStore((s) => s.printKOT);
+  const autoPrintKot = usePrinterStore((s) => s.autoPrintKot);
 
   // Escape-to-close, matching every other modal in this module.
   useEffect(() => {
@@ -152,11 +153,15 @@ export default function CreateOrderFlow({
   // after the order is created against the table's active session, force
   // a KOT print for just this new order via the existing QZ Tray
   // integration (same pipeline as TableDetailsDrawer's "Print KOT" /
-  // Reprint button), regardless of the Auto Print KOT setting. Best-effort
-  // — a print failure here is surfaced but never blocks the order from
-  // having been created (the admin can always reprint from the table
-  // popup's header button afterwards), matching the "never throws into
-  // the order-creation response" pattern used elsewhere for KOT printing.
+  // Reprint button). Skipped when Auto Print KOT is on: KotAutoPrintProvider
+  // already prints this same order the instant its "new-order" Socket.IO
+  // event arrives, so firing this too would print the same KOT twice. Only
+  // fires the explicit print when auto-print is off, so staff still get a
+  // guaranteed ticket from this button in that case. Best-effort — a print
+  // failure here is surfaced but never blocks the order from having been
+  // created (the admin can always reprint from the table popup's header
+  // button afterwards), matching the "never throws into the
+  // order-creation response" pattern used elsewhere for KOT printing.
   const handleSubmit = async (printKot = false) => {
     setSubmitting(true);
     setSubmitError(null);
@@ -170,7 +175,7 @@ export default function CreateOrderFlow({
         specialInstructions: specialInstructions.trim() || undefined,
       });
 
-      if (printKot) {
+      if (printKot && !autoPrintKot) {
         try {
           const kot: KOTOrder = {
             orderId: order.orderId,

@@ -74,6 +74,7 @@ export default function TableCreateOrderScreen({
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const printKotViaQz = usePrinterStore((s) => s.printKOT);
+  const autoPrintKot = usePrinterStore((s) => s.autoPrintKot);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -150,11 +151,13 @@ export default function TableCreateOrderScreen({
         specialInstructions: instructions.trim(),
       });
 
-      // "Create & Print KOT" — explicitly print via QZ Tray on top of
-      // whatever KotAutoPrintProvider already does automatically for every
-      // new order, so staff get a guaranteed ticket right here regardless
-      // of the auto-print setting.
-      if (mode === "order-kot") {
+      // "Create & Print KOT" — explicitly print via QZ Tray. Skipped when
+      // Auto Print KOT is on: KotAutoPrintProvider already prints this same
+      // order the instant its "new-order" Socket.IO event arrives, so
+      // firing this too would print the same KOT twice. Only fire the
+      // explicit print when auto-print is off, so staff still get their
+      // guaranteed ticket from this button in that case.
+      if (mode === "order-kot" && !autoPrintKot) {
         const kot: KOTOrder = {
           orderId: order.orderId,
           tableLabel: order.tableLabel,
