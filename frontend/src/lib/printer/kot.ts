@@ -121,11 +121,27 @@ function isKitchenOverrideItem(item: { id?: string; name?: string } | undefined)
   return KITCHEN_OVERRIDE_ITEM_NAMES.has(normalizeCategory(item?.name ?? ""));
 }
 
+// Item-level override: Regular/Brownie/Nutella Hot Chocolate must always
+// print on the Counter Printer, regardless of which category they're
+// currently filed under. Unlike the Kitchen override above, this is keyed
+// by `id` ONLY (no name fallback) — "Brownie" and "Nutella" are also the
+// names of unrelated Cold Coffee items (brownie-cold-coffee,
+// nutella-cold-coffee), so matching on name alone would be ambiguous.
+// Every menu item's `id` is a required field (see models/MenuItem.js), so
+// there's no real-world case where a KOT line for these items lacks one.
+const COUNTER_OVERRIDE_ITEM_IDS = new Set(["hot-chocolate-regular", "hot-chocolate-brownie", "hot-chocolate-nutella"]);
+
+function isCounterOverrideItem(item: { id?: string } | undefined): boolean {
+  const id = item?.id?.trim().toLowerCase();
+  return !!id && COUNTER_OVERRIDE_ITEM_IDS.has(id);
+}
+
 /**
  * Resolves which printer a single order line belongs on — primarily by
- * category, with a narrow item-level override (see
- * KITCHEN_OVERRIDE_ITEM_IDS above) for the handful of items that need to
- * print on a different printer than the rest of their category.
+ * category, with narrow item-level overrides (see
+ * KITCHEN_OVERRIDE_ITEM_IDS / COUNTER_OVERRIDE_ITEM_IDS above) for the
+ * handful of items that need to print on a different printer than the
+ * rest of their category.
  *
  * A category that matches neither list (e.g. a brand-new menu category
  * created before this routing table is updated) falls back to the Kitchen
@@ -139,6 +155,7 @@ function isKitchenOverrideItem(item: { id?: string; name?: string } | undefined)
  * re-deriving it. Never call this to change routing; it's read-only.
  */
 export function resolvePrinterRole(item: { id?: string; name?: string; categoryTitle?: string } | undefined): KOTPrinterRole {
+  if (isCounterOverrideItem(item)) return "counter";
   if (isKitchenOverrideItem(item)) return "kitchen";
 
   const key = normalizeCategory(item?.categoryTitle ?? "");
