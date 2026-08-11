@@ -860,31 +860,7 @@ async function updateOrderItemStatus(orderId, restaurantId, lineId, newStatus) {
 
   return order;
 }
-const sessionOrders = await Order.find({ orderId: { $in: session.orderIds } });
-session.currentBill = sessionOrders.reduce((sum, o) => sum + o.totalAmount, 0);
-await session.save();
 
-// NEW: if every order in this session is now cancelled/zero, the table
-// isn't really occupied anymore — free it, same as deleteOrderCascade.
-const stillActive = sessionOrders.some(
-  (o) => o.status !== "cancelled" && o.totalAmount > 0
-);
-if (!stillActive && session.status === "active") {
-  session.status = "closed";
-  session.sessionEnd = new Date();
-  await session.save();
-  emitSessionEnded(session);
-
-  const table = await Table.findById(session.tableId);
-  if (table && table.currentSessionId === session.sessionId) {
-    table.status = "available";
-    table.currentSessionId = null;
-    table.currentReservationId = null;
-    table.occupiedAt = null;
-    await table.save();
-    emitTableAvailable(table);
-  }
-}
 // Permanent Order Deletion (Admin Dashboard -> Orders -> Delete): removes an
 // order as if it had never been created — a HARD delete, not a status
 // change to "cancelled". Every place an orderId is denormalized elsewhere
