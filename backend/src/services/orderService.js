@@ -50,7 +50,14 @@ const TAX_RATE = 0.05;
 // client (see frontend lib/api.ts PlaceOrderPayload). Only groups defined
 // on `menuItem.modifierGroups` are ever considered — anything else the
 // client sends is silently ignored, not merged into the order.
-function resolveLineModifiers(menuItem, requestedModifiers, itemLabel) {
+//
+// enforceRequired: true for the Customer QR flow (validateAndBuildOrder) —
+// a required group can never be skipped there. false for Admin Manual
+// Ordering (validateAndBuildAdminOrder) — staff can create an order without
+// picking a required modifier at all; that line is simply stored with no
+// modifier selection, no popup, no block at Create Order.
+function resolveLineModifiers(menuItem, requestedModifiers, itemLabel, options = {}) {
+  const { enforceRequired = true } = options;
   const groups = menuItem.modifierGroups || [];
   if (groups.length === 0) return { modifiers: [], priceDelta: 0 };
 
@@ -67,6 +74,7 @@ function resolveLineModifiers(menuItem, requestedModifiers, itemLabel) {
     const selectedIds = [...new Set(rawIds.filter(Boolean))];
 
     if (group.required && selectedIds.length === 0) {
+      if (!enforceRequired) continue; // Admin Manual Ordering: leave this group unselected
       throw new ApiError(400, `Please select ${group.name} for "${itemLabel}"`);
     }
     if (group.selectionType === "single" && selectedIds.length > 1) {
@@ -511,13 +519,14 @@ async function validateAndBuildAdminOrder(body, staff) {
     }
     const quantity = Math.max(1, Number(requested.quantity) || 1);
 
-    // Menu Item Customization (Modifiers) — see the matching comment in
-    // validateAndBuildOrder above. Admin Manual Ordering doesn't yet have a
-    // picker UI for selecting a sauce, but the validation still applies:
-    // staff can't accidentally place a customizable item without its
-    // required selection either, and can pass `modifiers` the same shape
-    // once that UI exists.
-    const { modifiers, priceDelta } = resolveLineModifiers(menuItem, requested.modifiers, menuItem.name);
+    // Menu Item Customization (Modifiers): Admin Manual Ordering adds an
+    // item straight to the order with no modifier popup at all — even a
+    // required group (e.g. Sauce) is left unselected here on purpose, so
+    // staff are never blocked at Create Order. Only the Customer QR flow
+    // (validateAndBuildOrder above) still enforces a required selection.
+    const { modifiers, priceDelta } = resolveLineModifiers(menuItem, requested.modifiers, menuItem.name, {
+      enforceRequired: false,
+    });
     const effectiveUnitPrice = menuItem.price + priceDelta;
 
     const lineGst = gstService.computeLineGst(effectiveUnitPrice, quantity, menuItem.gstSlab, gstSettings);
