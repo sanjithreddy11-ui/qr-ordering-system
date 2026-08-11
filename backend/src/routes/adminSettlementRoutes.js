@@ -8,6 +8,7 @@ const {
   getCreditCustomers,
   clearCreditBalance,
   getSettlementAnalytics,
+  getDateWiseReport,
 } = require("../controllers/settlementController");
 
 const router = express.Router();
@@ -21,6 +22,8 @@ router.get("/history", getSettlementHistory);
 router.get("/credits", getCreditCustomers);
 router.patch("/credits/:phone/clear", clearCreditBalance);
 router.get("/analytics", getSettlementAnalytics);
+// Date-wise Collection & Settlement Reporting (Settlements -> Reports tab).
+router.get("/reports", getDateWiseReport);
 
 router.get("/:id", getSettlement);
 router.patch("/:id", collectSettlement);

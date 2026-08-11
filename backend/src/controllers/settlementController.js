@@ -6,6 +6,7 @@ const Customer = require("../models/Customer");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
 const { submitBillForTable } = require("../services/settlementService");
+const getBusinessDate = require("../utils/getBusinessDate");
 const {
   emitSettlementUpdated,
   emitSessionEnded,
@@ -16,37 +17,71 @@ const PAYMENT_METHODS = Settlement.PAYMENT_METHODS; // ["cash","upi","card","ban
 const PAYMENT_STATUSES = Settlement.PAYMENT_STATUSES; // ["pending","paid","credit","cancelled"]
 const COLLECTION_STATUSES = Settlement.COLLECTION_STATUSES; // ["UNPAID","PARTIALLY_PAID","PAID"]
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+// Fixed IST offset — India does not observe DST, so this is safe/stable
+// year-round (same reasoning as utils/getBusinessDate.js).
+const IST_SUFFIX = "+05:30";
+
 function startOfDay(date) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
   return d;
 }
 
+// Date-wise Collection & Settlement Reporting: the UTC instants
+// corresponding to 00:00:00.000 and 23:59:59.999 of `businessDateStr`
+// ("YYYY-MM-DD") in Asia/Kolkata. Used instead of startOfDay()/Date
+// arithmetic anywhere a report needs to line up with what the restaurant
+// actually calls "10 August" — startOfDay() alone uses the server's own
+// timezone, which is wrong the moment the server itself isn't running in
+// IST (e.g. UTC in production), silently shifting the day boundary by up
+// to 5.5 hours.
+function istDayBounds(businessDateStr) {
+  return {
+    start: new Date(`${businessDateStr}T00:00:00.000${IST_SUFFIX}`),
+    end: new Date(`${businessDateStr}T23:59:59.999${IST_SUFFIX}`),
+  };
+}
+
 // Shared date-range resolver for History and Analytics/Reports —
 // mirrors the same "today" default + named ranges pattern already used by
-// paymentAnalyticsController.js, plus an explicit custom range.
+// paymentAnalyticsController.js, plus an explicit custom range. Every named
+// range is anchored to the restaurant's Asia/Kolkata business date (see
+// istDayBounds above) rather than the server's local clock.
 function resolveRange(query) {
   const now = new Date();
-  const today0 = startOfDay(now);
+  const todayStr = getBusinessDate(now);
+  const { start: todayStart } = istDayBounds(todayStr);
 
   switch (query.range) {
     case "yesterday": {
-      const y0 = new Date(today0.getTime() - 24 * 60 * 60 * 1000);
-      return { from: y0, to: today0 };
+      const y0 = new Date(todayStart.getTime() - DAY_MS);
+      const y1 = new Date(todayStart.getTime() - 1);
+      return { from: y0, to: y1 };
     }
     case "7d":
-      return { from: new Date(today0.getTime() - 7 * 24 * 60 * 60 * 1000), to: now };
+      // Today plus the 6 days before it = 7 days inclusive.
+      return { from: new Date(todayStart.getTime() - 6 * DAY_MS), to: now };
     case "30d":
     case "lastMonth":
-      return { from: new Date(today0.getTime() - 30 * 24 * 60 * 60 * 1000), to: now };
-    case "custom":
-      return {
-        from: query.from ? new Date(query.from) : today0,
-        to: query.to ? new Date(new Date(query.to).getTime() + 24 * 60 * 60 * 1000 - 1) : now,
-      };
+      return { from: new Date(todayStart.getTime() - 29 * DAY_MS), to: now };
+    // Date-wise Collection & Settlement Reporting: calendar month-to-date
+    // in IST, e.g. selected on 11 Aug -> 1 Aug 00:00 IST through now.
+    case "thisMonth": {
+      const monthStartStr = `${todayStr.slice(0, 7)}-01`;
+      const { start: monthStart } = istDayBounds(monthStartStr);
+      return { from: monthStart, to: now };
+    }
+    case "custom": {
+      const fromStr = query.from || todayStr;
+      const toStr = query.to || todayStr;
+      const { start } = istDayBounds(fromStr);
+      const { end } = istDayBounds(toStr);
+      return { from: start, to: end };
+    }
     case "today":
     default:
-      return { from: today0, to: now };
+      return { from: todayStart, to: new Date(todayStart.getTime() + DAY_MS - 1) };
   }
 }
 
@@ -627,6 +662,199 @@ const getSettlementAnalytics = asyncHandler(async (req, res) => {
   });
 });
 
+// GET /api/admin/settlements/reports
+//   ?restaurantId=&range=today|yesterday|7d|30d|thisMonth|custom&from=&to=
+//   &method=cash|upi|card|bank_transfer|credit&status=&collectionStatus=
+//
+// Date-wise Collection & Settlement Reporting (Settlements -> Reports):
+// powers the date/range picker, summary cards, payment-method breakdown,
+// daily trend/table and transaction list all from one call, so every
+// figure on the page is guaranteed to come from the same underlying query
+// instead of drifting apart across separate requests.
+//
+// Every bill is bucketed by the date money actually moved
+// (settlementTime), falling back to submittedAt only for bills that
+// haven't been collected at all yet (still "pending", or an unpaid Credit
+// balance never has a second settlementTime) — so a bill submitted 10 Aug
+// 11:50 PM and settled 11 Aug 12:10 AM correctly lands under 11 Aug, per
+// the module spec, while a same-day-but-uncollected bill still shows up
+// under the day it happened instead of silently disappearing from the
+// report. Day buckets use Asia/Kolkata (see resolveRange/istDayBounds
+// above) so this is correct regardless of the server's own timezone.
+const getDateWiseReport = asyncHandler(async (req, res) => {
+  const { restaurantId, method, status, collectionStatus } = req.query;
+  if (!restaurantId) throw new ApiError(400, "restaurantId query param is required");
+
+  const { from, to } = resolveRange(req.query);
+  if (from > to) throw new ApiError(400, "From date must be before or equal to To date");
+
+  const effectiveDate = { $ifNull: ["$settlementTime", "$submittedAt"] };
+
+  const match = {
+    restaurantId,
+    // Cancelled bills are never counted as collected revenue, matching
+    // getSettlementAnalytics — a restaurant's collection report should not
+    // include money that was never actually taken.
+    paymentStatus: { $ne: "cancelled" },
+    $expr: { $and: [{ $gte: [effectiveDate, from] }, { $lte: [effectiveDate, to] }] },
+  };
+  if (status && PAYMENT_STATUSES.includes(status)) match.paymentStatus = status;
+  if (collectionStatus && COLLECTION_STATUSES.includes(collectionStatus)) {
+    match.collectionStatus = collectionStatus;
+  }
+  // A bill counts toward a method filter if any part of it was paid that
+  // way — correct for split payments (e.g. filtering "Cash" still surfaces
+  // a Cash+UPI bill, and its real UPI portion still lands under UPI in the
+  // breakdown below, rather than being misattributed).
+  if (method && PAYMENT_METHODS.includes(method)) match["paymentMethods.method"] = method;
+
+  const [summaryAgg, methodAgg, dailyAgg, dailyMethodAgg, transactions] = await Promise.all([
+    Settlement.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: null,
+          totalSales: { $sum: "$grandTotal" },
+          totalBills: { $sum: 1 },
+          totalDiscount: { $sum: { $ifNull: ["$discount", 0] } },
+          // Not-yet-collected money: bills still "pending" in full, plus
+          // whatever shortfall remains on bills that were completed
+          // without being fully paid (Credit or a partial collection).
+          pendingGrandTotal: { $sum: { $cond: [{ $eq: ["$paymentStatus", "pending"] }, "$grandTotal", 0] } },
+          shortfall: { $sum: { $cond: [{ $gt: ["$remainingAmount", 0] }, "$remainingAmount", 0] } },
+        },
+      },
+    ]),
+    // Payment-method breakdown: unwind so a split bill (e.g. Cash ₹600 +
+    // UPI ₹400) contributes to each method separately instead of being
+    // grouped under just one. Credit lines are excluded — that portion
+    // hasn't actually been received (it's covered by pendingGrandTotal /
+    // shortfall above, surfaced as Credit/Pending).
+    Settlement.aggregate([
+      { $match: match },
+      { $unwind: "$paymentMethods" },
+      { $match: { "paymentMethods.method": { $ne: "credit" } } },
+      { $group: { _id: "$paymentMethods.method", total: { $sum: "$paymentMethods.amount" } } },
+    ]),
+    // Date-wise breakdown table + daily trend chart, one row per Kolkata
+    // calendar day in range.
+    Settlement.aggregate([
+      { $match: match },
+      { $addFields: { _bucketDate: effectiveDate } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$_bucketDate", timezone: "Asia/Kolkata" } },
+          bills: { $sum: 1 },
+          totalSales: { $sum: "$grandTotal" },
+          discount: { $sum: { $ifNull: ["$discount", 0] } },
+          pendingGrandTotal: { $sum: { $cond: [{ $eq: ["$paymentStatus", "pending"] }, "$grandTotal", 0] } },
+          shortfall: { $sum: { $cond: [{ $gt: ["$remainingAmount", 0] }, "$remainingAmount", 0] } },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]),
+    // Same per-method split as methodAgg above, but grouped per day too —
+    // powers the Cash/UPI/Card columns of the daily breakdown table.
+    Settlement.aggregate([
+      { $match: match },
+      { $addFields: { _bucketDate: effectiveDate } },
+      { $unwind: "$paymentMethods" },
+      { $match: { "paymentMethods.method": { $ne: "credit" } } },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { format: "%Y-%m-%d", date: "$_bucketDate", timezone: "Asia/Kolkata" } },
+            method: "$paymentMethods.method",
+          },
+          total: { $sum: "$paymentMethods.amount" },
+        },
+      },
+    ]),
+    // Transaction Details table — reuses the exact Settlement fields
+    // already shown on Settlement History, so no new bill-level data model
+    // is introduced for the report.
+    Settlement.find(match)
+      .select(
+        "settlementId billNumber tableLabel customerName phoneNumber grandTotal totalReceived remainingAmount paymentMethods paymentMethod paymentStatus collectionStatus settlementTime submittedAt receivedBy"
+      )
+      .sort({ submittedAt: -1 })
+      .limit(1000)
+      .lean(),
+  ]);
+
+  const summary = summaryAgg[0] || {
+    totalSales: 0,
+    totalBills: 0,
+    totalDiscount: 0,
+    pendingGrandTotal: 0,
+    shortfall: 0,
+  };
+  const methodTotals = Object.fromEntries(methodAgg.map((r) => [r._id, r.total]));
+  const cashCollected = round2(methodTotals.cash || 0);
+  const upiCollected = round2(methodTotals.upi || 0);
+  const cardCollected = round2(methodTotals.card || 0);
+  const bankTransferCollected = round2(methodTotals.bank_transfer || 0);
+  const onlineCollected = round2(upiCollected + cardCollected + bankTransferCollected);
+  const creditPending = round2((summary.pendingGrandTotal || 0) + (summary.shortfall || 0));
+
+  const dailyMethodMap = {};
+  for (const row of dailyMethodAgg) {
+    const { date, method: m } = row._id;
+    if (!dailyMethodMap[date]) dailyMethodMap[date] = {};
+    dailyMethodMap[date][m] = row.total;
+  }
+
+  const dailyBreakdown = dailyAgg.map((row) => {
+    const methods = dailyMethodMap[row._id] || {};
+    const cash = round2(methods.cash || 0);
+    const upi = round2(methods.upi || 0);
+    const card = round2(methods.card || 0);
+    const bankTransfer = round2(methods.bank_transfer || 0);
+    return {
+      date: row._id,
+      bills: row.bills,
+      cash,
+      upi,
+      card,
+      onlinePayments: round2(upi + card + bankTransfer),
+      creditPending: round2((row.pendingGrandTotal || 0) + (row.shortfall || 0)),
+      discounts: round2(row.discount || 0),
+      totalSales: round2(row.totalSales || 0),
+    };
+  });
+
+  res.json({
+    range: { from, to },
+    filters: { method: method || null, status: status || null, collectionStatus: collectionStatus || null },
+    summary: {
+      totalSales: round2(summary.totalSales || 0),
+      totalBills: summary.totalBills || 0,
+      cashCollected,
+      upiCollected,
+      cardCollected,
+      bankTransferCollected,
+      onlineCollected,
+      creditPending,
+      totalDiscount: round2(summary.totalDiscount || 0),
+    },
+    paymentMethodBreakdown: {
+      cash: cashCollected,
+      upi: upiCollected,
+      card: cardCollected,
+      bankTransfer: bankTransferCollected,
+      credit: creditPending,
+    },
+    dailyBreakdown,
+    // Report is capped at the 1000 most-recently-submitted matching bills —
+    // generous for a single restaurant's typical volume even over "This
+    // Month", while keeping the response bounded. `summary`/`dailyBreakdown`
+    // above are always computed by the database over the full matching set
+    // regardless of this cap, so totals stay accurate even if it's hit.
+    transactionsTruncated: transactions.length >= 1000,
+    transactions,
+  });
+});
+
 module.exports = {
   listSettlements,
   getSettlement,
@@ -636,4 +864,5 @@ module.exports = {
   getCreditCustomers,
   clearCreditBalance,
   getSettlementAnalytics,
+  getDateWiseReport,
 };

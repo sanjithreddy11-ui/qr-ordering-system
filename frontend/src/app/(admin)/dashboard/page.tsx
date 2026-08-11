@@ -290,6 +290,26 @@ export default function AdminOverviewPage() {
       {!loading && (
         <>
           {/* ---- Payment breakdown (today's settled payments) ---- */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+            <div style={{ fontFamily: bodyFont, fontSize: 13, fontWeight: 700, color: adminColors.textSecondary, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              Today&apos;s Collections
+            </div>
+            <Link
+              href="/dashboard/settlements?tab=reports"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                fontFamily: bodyFont,
+                fontSize: 13,
+                fontWeight: 700,
+                color: adminColors.primary,
+                textDecoration: "none",
+              }}
+            >
+              View Date-wise Reports <ArrowRight size={14} />
+            </Link>
+          </div>
           <div
             style={{
               display: "grid",

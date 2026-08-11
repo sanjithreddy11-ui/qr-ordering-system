@@ -1313,6 +1313,9 @@ export async function collectSettlement(
 }
 
 export type SettlementHistoryRange = "today" | "yesterday" | "7d" | "30d" | "custom";
+// Date-wise Collection & Settlement Reporting: superset of SettlementHistoryRange
+// with "thisMonth" (calendar month-to-date), used by fetchDateWiseReport.
+export type ReportRange = SettlementHistoryRange | "thisMonth";
 
 export async function fetchSettlementHistory(
   restaurantId: string,
@@ -1414,6 +1417,66 @@ export async function fetchSettlementAnalytics(
   }
   const res = await authFetch(`/api/admin/settlements/analytics?${params.toString()}`);
   return handle<SettlementAnalytics>(res);
+}
+
+// ---------- Date-wise Collection & Settlement Reporting (Settlements -> Reports) ----------
+
+export interface DateWiseReportFilters {
+  method?: SettlementPaymentMethod;
+  status?: SettlementPaymentStatus;
+  collectionStatus?: SettlementCollectionStatus;
+}
+
+export interface DailyCollectionRow {
+  date: string; // "YYYY-MM-DD", Asia/Kolkata business date
+  bills: number;
+  cash: number;
+  upi: number;
+  card: number;
+  onlinePayments: number;
+  creditPending: number;
+  discounts: number;
+  totalSales: number;
+}
+
+export interface DateWiseReportSummary {
+  totalSales: number;
+  totalBills: number;
+  cashCollected: number;
+  upiCollected: number;
+  cardCollected: number;
+  bankTransferCollected: number;
+  onlineCollected: number;
+  creditPending: number;
+  totalDiscount: number;
+}
+
+export interface DateWiseReport {
+  range: { from: string; to: string };
+  filters: { method: SettlementPaymentMethod | null; status: SettlementPaymentStatus | null; collectionStatus: SettlementCollectionStatus | null };
+  summary: DateWiseReportSummary;
+  paymentMethodBreakdown: { cash: number; upi: number; card: number; bankTransfer: number; credit: number };
+  dailyBreakdown: DailyCollectionRow[];
+  transactions: Settlement[];
+  transactionsTruncated: boolean;
+}
+
+export async function fetchDateWiseReport(
+  restaurantId: string,
+  range: ReportRange = "today",
+  opts: { from?: string; to?: string } & DateWiseReportFilters = {}
+): Promise<DateWiseReport> {
+  const params = new URLSearchParams({ restaurantId, range });
+  if (range === "custom") {
+    if (opts.from) params.set("from", opts.from);
+    if (opts.to) params.set("to", opts.to);
+  }
+  if (opts.method) params.set("method", opts.method);
+  if (opts.status) params.set("status", opts.status);
+  if (opts.collectionStatus) params.set("collectionStatus", opts.collectionStatus);
+
+  const res = await authFetch(`/api/admin/settlements/reports?${params.toString()}`);
+  return handle<DateWiseReport>(res);
 }
 
 // ---------- Stock Management ----------
