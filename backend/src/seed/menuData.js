@@ -149,6 +149,19 @@ const rawMenu = [
     ],
   },
   {
+    id: "hot-chocolate",
+    title: "Hot Chocolate",
+    items: [
+      // NOTE: printDestination is a placeholder field name. Once we see
+      // your actual schema / print-routing file, this may need to become
+      // a different field (e.g. `printerId`, `station`, `destination`)
+      // or be derived from the category instead of the item.
+      { id: "regular-hot-chocolate", name: "Regular Hot Chocolate", description: "Classic, rich hot chocolate served warm and smooth.", price: 199, diet: "veg", image: "/fooditems/hch16.png", printDestination: "counter" },
+      { id: "brownie-hot-chocolate", name: "Brownie Hot Chocolate", description: "Warm hot chocolate blended with chunks of fudgy brownie.", price: 249, diet: "veg", image: "/fooditems/hch17.png", printDestination: "counter" },
+      { id: "nutella-hot-chocolate", name: "Nutella Hot Chocolate", description: "Silky hot chocolate swirled with rich Nutella.", price: 249, diet: "veg", image: "/fooditems/hch18.png", printDestination: "counter" },
+    ],
+  },
+  {
     id: "hot-tea",
     title: "Hot Tea",
     items: [
@@ -330,6 +343,11 @@ function buildMenuItemDocs() {
         // default `[]` (see models/MenuItem.js), same as any item created
         // before this feature existed.
         modifierGroups: item.modifierGroups,
+        // Printer routing: only present on items that declare it above
+        // (currently the Hot Chocolate category) — undefined for every
+        // other item, which should fall back to the kitchen printer via
+        // whatever default the schema/routing logic defines.
+        printDestination: item.printDestination,
       });
     });
   });
