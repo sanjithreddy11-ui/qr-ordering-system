@@ -145,9 +145,7 @@ const rawMenu = [
       { id: "caramel-mocha", name: "Caramel Mocha", description: "Espresso, chocolate and caramel topped with steamed milk.", price: 239, diet: "veg", image: "/fooditems/hc13.png" },
       { id: "irish-cappuccino", name: "Irish Cappuccino", description: "Classic cappuccino finished with a warm Irish coffee twist.", price: 249, diet: "veg", image: "/fooditems/hc14.png" },
       { id: "vanilla-cappuccino", name: "Vanilla Cappuccino", description: "Classic cappuccino sweetened with smooth vanilla syrup.", price: 249, diet: "veg", image: "/fooditems/hc15.png" },
-      { id: "hot-chocolate-regular", name: "Regular", description: "Rich, warm hot chocolate made with melted chocolate and milk.", price: 249, diet: "veg", image: "/fooditems/hc16.png" },
-      { id: "hot-chocolate-brownie", name: "Brownie", description: "Warm hot chocolate topped with chunks of fudgy brownie.", price: 279, diet: "veg", image: "/fooditems/hc17.png" },
-      { id: "hot-chocolate-nutella", name: "Nutella", description: "Warm hot chocolate swirled with rich Nutella.", price: 279, diet: "veg", image: "/fooditems/hc18.png" },
+      
     ],
   },
   {
