@@ -26,6 +26,16 @@ import { TablePrimaryButton } from "./tableButtons";
 import { TABLE_BUTTON_COLORS, statusMeta } from "./tableStatus";
 import { usePrinterStore } from "@/store/printer-store";
 import type { KOTOrder } from "@/lib/printer/kot";
+// Menu Item Customization (Modifiers): Admin Create Order reuses the exact
+// same modal, "does this item need a modifier?" check, and cart-line-identity
+// helper that the Customer QR ordering flow already uses (see
+// components/customer/ModifierModal.tsx and lib/menu-data.ts), instead of
+// re-implementing any of that logic for the admin dashboard. Both types are
+// structurally identical to AdminMenuItem/AdminModifierGroup/
+// SelectedOrderModifier in lib/admin-api.ts (mirrored from the same backend
+// models), so they can be reused here as-is with no adapter needed.
+import ModifierModal from "@/components/customer/ModifierModal";
+import { requiresCustomization, cartEntryKey, type SelectedModifier } from "@/lib/menu-data";
 
 const FONT = "var(--font-body, 'Inter', system-ui, sans-serif)";
 const TAX_RATE = 0.05; // Mirrors backend/src/services/orderService.js TAX_RATE — display only, server recomputes.
@@ -39,9 +49,18 @@ type OrderType = "dine-in" | "takeaway";
 type Step = "orderType" | "table" | "customer" | "menu" | "summary";
 
 interface CartLine {
+  // Menu Item Customization (Modifiers): a stable identity for this cart
+  // line — plain `menuItem.id` for a non-customizable item (unchanged from
+  // before this feature), or `menuItem.id` + selected modifiers for a
+  // customizable one, via the same `cartEntryKey` helper the Customer QR
+  // flow uses. Two lines for the same item with different modifiers (e.g.
+  // Red Sauce vs Mixed Sauce) get different keys, so they stay separate
+  // lines instead of overwriting each other — see upsertCartLine below.
+  key: string;
   menuItem: AdminMenuItem;
   quantity: number;
   notes: string;
+  modifiers?: SelectedModifier[];
 }
 
 function resolveImageSrc(image: string) {
@@ -126,26 +145,37 @@ export default function CreateOrderFlow({
   const taxAmount = Math.round(subtotal * TAX_RATE);
   const grandTotal = subtotal + taxAmount;
 
-  const upsertCartLine = (menuItem: AdminMenuItem, quantity: number, notes: string) => {
+  const upsertCartLine = (
+    menuItem: AdminMenuItem,
+    quantity: number,
+    notes: string,
+    modifiers?: SelectedModifier[]
+  ) => {
+    // Menu Item Customization (Modifiers): keyed by item + modifiers (same
+    // helper as the Customer QR flow's cart store), not just item id, so
+    // adding "Chicken Spaghetti · Red Sauce" then "Chicken Spaghetti · Mixed
+    // Sauce" creates two lines instead of the second silently overwriting
+    // the first.
+    const key = cartEntryKey(menuItem.id, modifiers);
     setCart((prev) => {
-      const existingIndex = prev.findIndex((l) => l.menuItem.id === menuItem.id);
-      if (existingIndex === -1) return [...prev, { menuItem, quantity, notes }];
+      const existingIndex = prev.findIndex((l) => l.key === key);
+      if (existingIndex === -1) return [...prev, { key, menuItem, quantity, notes, modifiers }];
       const next = [...prev];
-      next[existingIndex] = { menuItem, quantity, notes };
+      next[existingIndex] = { key, menuItem, quantity, notes, modifiers };
       return next;
     });
   };
 
-  const changeQuantity = (itemId: string, delta: number) => {
+  const changeQuantity = (key: string, delta: number) => {
     setCart((prev) =>
       prev
-        .map((l) => (l.menuItem.id === itemId ? { ...l, quantity: l.quantity + delta } : l))
+        .map((l) => (l.key === key ? { ...l, quantity: l.quantity + delta } : l))
         .filter((l) => l.quantity > 0)
     );
   };
 
-  const removeLine = (itemId: string) => {
-    setCart((prev) => prev.filter((l) => l.menuItem.id !== itemId));
+  const removeLine = (key: string) => {
+    setCart((prev) => prev.filter((l) => l.key !== key));
   };
 
   // `printKot` — "Create & Print KOT" (Admin Create Order From Table):
@@ -164,7 +194,21 @@ export default function CreateOrderFlow({
       const order = await createAdminOrder({
         orderType: orderType!,
         tableId: orderType === "dine-in" ? selectedTable?._id : undefined,
-        items: cart.map((l) => ({ id: l.menuItem.id, quantity: l.quantity, notes: l.notes })),
+        items: cart.map((l) => ({
+          id: l.menuItem.id,
+          quantity: l.quantity,
+          notes: l.notes,
+          // Menu Item Customization (Modifiers): grouped back into
+          // { groupId, optionIds }, the exact shape
+          // resolveLineModifiers/validateAndBuildAdminOrder expects on the
+          // backend — same conversion the Customer QR checkout already does
+          // (see app/(customer)/checkout/page.tsx). Omitted for a plain
+          // item (l.modifiers is undefined/empty).
+          modifiers:
+            l.modifiers && l.modifiers.length > 0
+              ? l.modifiers.map((m) => ({ groupId: m.groupId, optionIds: [m.optionId] }))
+              : undefined,
+        })),
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
         specialInstructions: specialInstructions.trim() || undefined,
@@ -623,8 +667,8 @@ function MenuStep({
 }: {
   restaurantId: string;
   cart: CartLine[];
-  onAdd: (item: AdminMenuItem, quantity: number, notes: string) => void;
-  onChangeQuantity: (itemId: string, delta: number) => void;
+  onAdd: (item: AdminMenuItem, quantity: number, notes: string, modifiers?: SelectedModifier[]) => void;
+  onChangeQuantity: (key: string, delta: number) => void;
 }) {
   const [categories, setCategories] = useState<AdminCategory[]>([]);
   const [items, setItems] = useState<AdminMenuItem[]>([]);
@@ -632,6 +676,14 @@ function MenuStep({
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [activeItem, setActiveItem] = useState<AdminMenuItem | null>(null);
+  // Menu Item Customization (Modifiers): the item currently in the reused
+  // ModifierModal (Sauce, etc.), and its confirmed selections once the
+  // admin picks and taps "Add to Cart" there — carried forward into the
+  // existing quantity/notes step (ItemCustomizeModal) below, exactly like
+  // the "+ Add" button worked before this feature, just with one extra
+  // required step in between for a customizable item.
+  const [modifierItem, setModifierItem] = useState<AdminMenuItem | null>(null);
+  const [pendingModifiers, setPendingModifiers] = useState<SelectedModifier[] | undefined>(undefined);
 
   useEffect(() => {
     fetchAdminCategories(restaurantId).then(setCategories).catch(() => {});
@@ -659,7 +711,12 @@ function MenuStep({
     return () => clearTimeout(handle);
   }, [restaurantId, search, categoryFilter]);
 
-  const cartQuantityFor = (itemId: string) => cart.find((l) => l.menuItem.id === itemId)?.quantity ?? 0;
+  // Menu Item Customization (Modifiers): a customizable item can now have
+  // several cart lines at once (one per sauce chosen) — sum across all of
+  // them for the badge shown on this card, same reasoning as the Customer
+  // QR menu page's equivalent quantity badge.
+  const cartQuantityFor = (itemId: string) =>
+    cart.filter((l) => l.menuItem.id === itemId).reduce((sum, l) => sum + l.quantity, 0);
 
   return (
     <div>
@@ -756,7 +813,25 @@ function MenuStep({
                   <button
                     type="button"
                     disabled={!item.isAvailable}
-                    onClick={() => setActiveItem(item)}
+                    onClick={() => {
+                      // Menu Item Customization (Modifiers): a customizable
+                      // item is NEVER added directly — "+ Add" always opens
+                      // the required-selection modal first (mirrors
+                      // handleAdd in app/(customer)/menu/page.tsx). Since a
+                      // customizable item can have several distinct cart
+                      // lines (different sauces), "+ Add" always starts a
+                      // fresh selection here rather than editing one
+                      // specific existing line — use the quantity stepper
+                      // on the Order Summary step to adjust an existing
+                      // line. A plain item is untouched: still opens the
+                      // same quantity/notes step as before, and still
+                      // toggles to "Edit" once it's in the cart.
+                      if (requiresCustomization(item)) {
+                        setModifierItem(item);
+                        return;
+                      }
+                      setActiveItem(item);
+                    }}
                     style={{
                       width: "100%",
                       padding: "8px 10px",
@@ -770,7 +845,7 @@ function MenuStep({
                       cursor: item.isAvailable ? "pointer" : "not-allowed",
                     }}
                   >
-                    {inCart > 0 ? "Edit" : "Add"}
+                    {!requiresCustomization(item) && inCart > 0 ? "Edit" : "Add"}
                   </button>
                 </div>
               </div>
@@ -779,18 +854,42 @@ function MenuStep({
         })}
       </div>
 
+      {/* Menu Item Customization (Modifiers): the exact modal the Customer
+          QR flow uses for its required-selection step — reused as-is, not
+          reimplemented. Confirming here hands off into the existing
+          quantity/notes step below with the selection carried along. */}
+      <ModifierModal
+        item={modifierItem}
+        onCancel={() => setModifierItem(null)}
+        onConfirm={(_item, modifiers) => {
+          setPendingModifiers(modifiers);
+          setActiveItem(modifierItem);
+          setModifierItem(null);
+        }}
+      />
+
       {activeItem && (
         <ItemCustomizeModal
           item={activeItem}
-          existing={cart.find((l) => l.menuItem.id === activeItem.id) ?? null}
-          onClose={() => setActiveItem(null)}
-          onAdd={(qty, notes) => {
-            onAdd(activeItem, qty, notes);
+          modifiers={pendingModifiers}
+          existing={
+            requiresCustomization(activeItem)
+              ? null
+              : cart.find((l) => l.menuItem.id === activeItem.id) ?? null
+          }
+          onClose={() => {
             setActiveItem(null);
+            setPendingModifiers(undefined);
+          }}
+          onAdd={(qty, notes) => {
+            onAdd(activeItem, qty, notes, pendingModifiers);
+            setActiveItem(null);
+            setPendingModifiers(undefined);
           }}
           onRemove={() => {
             onChangeQuantity(activeItem.id, -cartQuantityFor(activeItem.id));
             setActiveItem(null);
+            setPendingModifiers(undefined);
           }}
         />
       )}
@@ -820,12 +919,18 @@ function DietDot({ diet }: { diet: "veg" | "non-veg" }) {
 function ItemCustomizeModal({
   item,
   existing,
+  modifiers,
   onClose,
   onAdd,
   onRemove,
 }: {
   item: AdminMenuItem;
   existing: CartLine | null;
+  // Menu Item Customization (Modifiers): the selection already confirmed in
+  // ModifierModal just before this step opened (undefined for a plain
+  // item) — shown read-only here since it was already picked; this step is
+  // only for quantity/notes.
+  modifiers?: SelectedModifier[];
   onClose: () => void;
   onAdd: (quantity: number, notes: string) => void;
   onRemove: () => void;
@@ -886,6 +991,28 @@ function ItemCustomizeModal({
             <X size={18} />
           </button>
         </div>
+
+        {modifiers && modifiers.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {modifiers.map((m) => (
+              <span
+                key={`${m.groupId}:${m.optionId}`}
+                style={{
+                  padding: "4px 10px",
+                  borderRadius: 999,
+                  background: adminColors.bg,
+                  border: `1px solid ${adminColors.border}`,
+                  fontFamily: FONT,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: adminColors.text,
+                }}
+              >
+                {m.groupName}: {m.optionName}
+              </span>
+            ))}
+          </div>
+        )}
 
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <span style={{ fontFamily: FONT, fontSize: 12, fontWeight: 700, color: adminColors.textSecondary, textTransform: "uppercase" }}>
@@ -1046,8 +1173,8 @@ function SummaryStep({
   subtotal: number;
   taxAmount: number;
   grandTotal: number;
-  onChangeQuantity: (itemId: string, delta: number) => void;
-  onRemove: (itemId: string) => void;
+  onChangeQuantity: (key: string, delta: number) => void;
+  onRemove: (key: string) => void;
   specialInstructions?: string;
   onChangeSpecialInstructions?: (v: string) => void;
 }) {
@@ -1068,7 +1195,7 @@ function SummaryStep({
       <div style={{ border: `1px solid ${adminColors.border}`, borderRadius: 14, overflow: "hidden", maxWidth: 640 }}>
         {cart.map((line, idx) => (
           <div
-            key={line.menuItem.id}
+            key={line.key}
             style={{
               display: "flex",
               alignItems: "center",
@@ -1081,17 +1208,23 @@ function SummaryStep({
               <div style={{ fontFamily: FONT, fontSize: 14, fontWeight: 700, color: adminColors.text }}>{line.menuItem.name}</div>
               <div style={{ fontFamily: FONT, fontSize: 12, color: adminColors.textSecondary, marginTop: 2 }}>
                 {formatCurrency(line.menuItem.price)} each
+                {/* Menu Item Customization (Modifiers): the selected
+                    option(s), e.g. "Sauce: Red Sauce" — same summary line
+                    format used for special-instruction notes. */}
+                {line.modifiers && line.modifiers.length > 0
+                  ? ` · ${line.modifiers.map((m) => `${m.groupName}: ${m.optionName}`).join(", ")}`
+                  : ""}
                 {line.notes ? ` · ${line.notes}` : ""}
               </div>
             </div>
-            <QuantityStepper value={line.quantity} onChange={(v) => onChangeQuantity(line.menuItem.id, v - line.quantity)} />
+            <QuantityStepper value={line.quantity} onChange={(v) => onChangeQuantity(line.key, v - line.quantity)} />
             <div style={{ fontFamily: FONT, fontSize: 14, fontWeight: 700, color: adminColors.text, minWidth: 64, textAlign: "right" }}>
               {formatCurrency(line.menuItem.price * line.quantity)}
             </div>
             <button
               type="button"
               aria-label={`Remove ${line.menuItem.name}`}
-              onClick={() => onRemove(line.menuItem.id)}
+              onClick={() => onRemove(line.key)}
               style={{ border: "none", background: "transparent", color: adminColors.textSecondary, cursor: "pointer" }}
             >
               <Trash2 size={15} />

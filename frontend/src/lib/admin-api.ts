@@ -1693,6 +1693,12 @@ export interface AdminOrderItemInput {
   id: string; // MenuItem.id
   quantity: number;
   notes?: string; // e.g. "No Onion", "Extra Cheese"
+  // Menu Item Customization (Modifiers): mirrors PlaceOrderPayload's item
+  // shape in lib/api.ts (Customer QR flow) exactly — validated server-side
+  // by the same resolveLineModifiers()/validateAndBuildAdminOrder() used
+  // for the customer flow, so a required group can't be skipped from
+  // either flow. Omitted/undefined for a plain item.
+  modifiers?: { groupId: string; optionIds: string[] }[];
 }
 
 export interface CreateAdminOrderPayload {
