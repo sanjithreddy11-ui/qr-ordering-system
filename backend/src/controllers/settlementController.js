@@ -5,7 +5,7 @@ const Order = require("../models/Order");
 const Customer = require("../models/Customer");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
-const { submitBillForTable } = require("../services/settlementService");
+const { submitBillForTable, deleteSettlementCascade } = require("../services/settlementService");
 const getBusinessDate = require("../utils/getBusinessDate");
 const {
   emitSettlementUpdated,
@@ -172,6 +172,32 @@ const createSettlement = asyncHandler(async (req, res) => {
 
   const { table, session, settlement } = await submitBillForTable(tableId, req.staff);
   res.status(201).json({ table, session, settlement });
+});
+
+// DELETE /api/admin/settlements/:id  (id = settlementId, e.g. "STL-000123")
+//
+// Permanent Settlement Deletion — NOT a status change to "cancelled". The
+// settlement document is physically removed from MongoDB, same "hard
+// delete" treatment adminOrderController.deleteOrder already gives Orders.
+// Closes the session and frees the table (deletion is just another way a
+// settlement's lifecycle ends — see
+// services/settlementService.js:deleteSettlementCascade), and keeps the
+// underlying orders in place for historical/reference purposes while
+// excluding them from revenue everywhere Orders are summed directly.
+//
+// Restricted to admins only — same as adminOrderController.deleteOrder —
+// since this is a destructive, unrecoverable action.
+const deleteSettlement = asyncHandler(async (req, res) => {
+  if (req.staff.role !== "admin") {
+    throw new ApiError(403, "Only admins can permanently delete settlements");
+  }
+
+  const settlement = await Settlement.findOne({ settlementId: req.params.id });
+  if (!settlement) throw new ApiError(404, "Settlement not found");
+
+  const { table, session } = await deleteSettlementCascade(settlement);
+
+  res.json({ success: true, settlementId: settlement.settlementId, table, session });
 });
 
 const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
@@ -859,6 +885,7 @@ module.exports = {
   listSettlements,
   getSettlement,
   createSettlement,
+  deleteSettlement,
   collectSettlement,
   getSettlementHistory,
   getCreditCustomers,

@@ -3,6 +3,7 @@ const {
   listSettlements,
   getSettlement,
   createSettlement,
+  deleteSettlement,
   collectSettlement,
   getSettlementHistory,
   getCreditCustomers,
@@ -27,6 +28,8 @@ router.get("/reports", getDateWiseReport);
 
 router.get("/:id", getSettlement);
 router.patch("/:id", collectSettlement);
+// Permanent delete — not a status change. See settlementController.deleteSettlement.
+router.delete("/:id", deleteSettlement);
 
 router.get("/", listSettlements);
 router.post("/", createSettlement);

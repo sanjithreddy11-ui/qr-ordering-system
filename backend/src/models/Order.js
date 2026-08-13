@@ -193,6 +193,20 @@ const orderSchema = new mongoose.Schema(
     paymentStatus: { type: String, enum: ["pending", "paid"], default: "pending" },
 
     status: { type: String, enum: ORDER_STATUSES, default: "pending", index: true },
+
+    // --- Settlements Module: settlement deletion ---
+    // Set true only when the Settlement this order was billed under is
+    // permanently deleted from the Settlements page (see
+    // services/settlementService.js:deleteSettlementCascade). The order
+    // itself is deliberately kept as-is (not cancelled, not deleted) for
+    // historical/reference purposes, but it must stop contributing to any
+    // revenue figure computed directly off the Order collection (Dashboard
+    // cards, Analytics, Revenue charts, Payments) — every one of those
+    // aggregations excludes `excludedFromRevenue: true` the same way they
+    // already exclude `status: "cancelled"`. Distinct from `status` so an
+    // order's own fulfillment history is never rewritten just because its
+    // bill was later voided.
+    excludedFromRevenue: { type: Boolean, default: false, index: true },
     // Timeline shown on the admin Orders page — one entry per status the
     // order has passed through, in order.
     statusHistory: {

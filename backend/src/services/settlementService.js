@@ -11,6 +11,9 @@ const {
   emitTableAwaitingPayment,
   emitSettlementCreated,
   emitSessionPaymentUpdated,
+  emitSessionEnded,
+  emitTableAvailable,
+  emitSettlementDeleted,
 } = require("../sockets/socket");
 
 // Shared by both the Tables billing popup's "Submit Bill" action
@@ -137,4 +140,65 @@ async function submitBillForTable(tableId, staff) {
   return { table, session, settlement };
 }
 
-module.exports = { submitBillForTable };
+// Settlements page -> Delete. Permanently removes the Settlement record
+// itself (a HARD delete, not a status change to "cancelled" — the record
+// must stop existing, per the Settlements Module spec) while:
+//   - closing the dining session it belonged to (if still active — a
+//     settlement can be deleted either before or after Collect Payment
+//     runs, since "pending" bills sit in Settlements too) and freeing the
+//     table, exactly like a normal Collect Payment does
+//     (settlementController.collectSettlement) — deletion is simply another
+//     way this settlement's lifecycle ends.
+//   - keeping every order that was billed under it untouched in the Order
+//     collection (never cancelled, never deleted) for historical/reference
+//     purposes, but flagging them `excludedFromRevenue` so no revenue figure
+//     computed directly off the Order collection (Dashboard cards,
+//     Analytics, Revenue charts, Payments — see dashboardController.js,
+//     analyticsController.js, paymentAnalyticsController.js) counts them
+//     again. Every Settlement-based figure (Today's Sales, Pending
+//     Collection, Settlement History, Reports, settlement Analytics) reads
+//     the Settlement collection live, so simply deleting the document
+//     already excludes it there — no separate bookkeeping needed for those.
+async function deleteSettlementCascade(settlement) {
+  const now = new Date();
+
+  const session = await TableSession.findOne({ sessionId: settlement.sessionId });
+  if (session && session.status === "active") {
+    session.status = "closed";
+    session.sessionEnd = now;
+    await session.save();
+    emitSessionEnded(session);
+  }
+
+  // Only free the table if it's still sitting on THIS settlement's session —
+  // same guard services/orderService.js:deleteOrderCascade uses. A
+  // settlement can be deleted long after it was collected, by which point
+  // the table may have already been freed (nothing to do) or, since only
+  // one dining session can ever be active per table (see the unique index
+  // on TableSession), may already be occupied by a brand-new session for a
+  // different party. Blindly freeing it here would wrongly kick out
+  // whoever is currently seated.
+  const table = await Table.findById(settlement.tableId);
+  if (table && table.currentSessionId === settlement.sessionId) {
+    table.status = "available";
+    table.currentSessionId = null;
+    table.currentReservationId = null;
+    table.occupiedAt = null;
+    await table.save();
+    emitTableAvailable(table);
+  }
+
+  if (settlement.orderIds.length > 0) {
+    await Order.updateMany(
+      { orderId: { $in: settlement.orderIds } },
+      { $set: { excludedFromRevenue: true } }
+    );
+  }
+
+  await Settlement.deleteOne({ _id: settlement._id });
+  emitSettlementDeleted(settlement);
+
+  return { table, session };
+}
+
+module.exports = { submitBillForTable, deleteSettlementCascade };

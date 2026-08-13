@@ -59,6 +59,7 @@ const DISCOUNT_ACCENT = "#C9971F";
 const LIVE_EVENTS = [
   "settlementCreated",
   "settlementUpdated",
+  "settlementDeleted",
   "sessionPaymentUpdated",
   "sessionEnded",
 ];

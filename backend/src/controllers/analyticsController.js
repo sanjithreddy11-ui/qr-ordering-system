@@ -19,6 +19,11 @@ const getAnalytics = asyncHandler(async (req, res) => {
   const match = {
     restaurantId,
     status: { $ne: "cancelled" },
+    // Settlements Module: excludes orders whose settlement was later
+    // deleted (Settlements page -> Delete) — kept in the Order collection
+    // for historical/reference purposes, but no longer valid revenue. See
+    // models/Order.js:excludedFromRevenue.
+    excludedFromRevenue: { $ne: true },
     placedAt: { $gte: fromDate, $lte: toDate },
   };
 
@@ -107,6 +112,8 @@ const getPeakHours = asyncHandler(async (req, res) => {
       $match: {
         restaurantId,
         status: { $ne: "cancelled" },
+        // See getAnalytics above — same exclusion.
+        excludedFromRevenue: { $ne: true },
         placedAt: { $gte: fromDate, $lte: toDate },
       },
     },

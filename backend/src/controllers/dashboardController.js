@@ -15,6 +15,11 @@ async function revenueBetween(restaurantId, from, to) {
       $match: {
         restaurantId,
         status: { $ne: "cancelled" },
+        // Settlements Module: an order whose settlement was later deleted
+        // (Settlements page -> Delete) stays in the collection for
+        // historical/reference purposes but must not count toward revenue —
+        // see models/Order.js:excludedFromRevenue.
+        excludedFromRevenue: { $ne: true },
         placedAt: { $gte: from, $lt: to },
       },
     },

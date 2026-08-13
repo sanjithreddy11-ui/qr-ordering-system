@@ -13,6 +13,9 @@ import {
   CreditCard,
   Receipt,
   Percent,
+  Trash2,
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import {
   BarChart,
@@ -23,7 +26,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { PageHeader, Card, Badge, SecondaryButton, adminColors } from "@/components/admin/ui";
+import { PageHeader, Card, Badge, SecondaryButton, PrimaryButton, Modal, adminColors } from "@/components/admin/ui";
 import { getSocket } from "@/lib/socket";
 import {
   fetchSettlements,
@@ -32,6 +35,7 @@ import {
   fetchSettlementAnalytics,
   fetchDateWiseReport,
   clearCreditBalance,
+  deleteSettlement,
   type Settlement,
   type SettlementPaymentStatus,
   type SettlementPaymentMethod,
@@ -50,6 +54,7 @@ const bodyFont = "var(--font-body, 'Inter', system-ui, sans-serif)";
 const LIVE_EVENTS = [
   "settlementCreated",
   "settlementUpdated",
+  "settlementDeleted",
   "tableAwaitingPayment",
   "tableAvailable",
   "sessionEnded",
@@ -195,7 +200,7 @@ function SettlementsPageInner() {
         ))}
       </div>
 
-      {tab === "pending" && <SettlementsTab onCollect={(id) => setCollectingId(id)} />}
+      {tab === "pending" && <SettlementsTab onCollect={(id) => setCollectingId(id)} onDeleted={loadAnalytics} />}
       {tab === "credits" && <CreditCustomersTab onChanged={loadAnalytics} />}
       {tab === "history" && <HistoryTab />}
       {tab === "reports" && <ReportsTab />}
@@ -218,13 +223,29 @@ function SettlementsPageInner() {
 // Tab 1: Settlement Table (Section 4) — every submitted bill, searchable and
 // filterable by status/method (Section 11).
 // ---------------------------------------------------------------------------
-function SettlementsTab({ onCollect }: { onCollect: (settlementId: string) => void }) {
+function SettlementsTab({
+  onCollect,
+  onDeleted,
+}: {
+  onCollect: (settlementId: string) => void;
+  onDeleted: () => void;
+}) {
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<SettlementPaymentStatus | "">("");
   const [method, setMethod] = useState<SettlementPaymentMethod | "">("");
   const [collectionStatus, setCollectionStatus] = useState<SettlementCollectionStatus | "">("");
+
+  // ---- Permanent Settlement Deletion ----
+  const [settlementToDelete, setSettlementToDelete] = useState<Settlement | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [toast, setToast] = useState<{ ok: boolean; message: string } | null>(null);
+
+  const showToast = (t: { ok: boolean; message: string }) => {
+    setToast(t);
+    setTimeout(() => setToast(null), 4000);
+  };
 
   const load = useCallback(async () => {
     try {
@@ -255,8 +276,43 @@ function SettlementsTab({ onCollect }: { onCollect: (settlementId: string) => vo
     };
   }, [load]);
 
+  // Permanent Settlement Deletion — NOT a status change to "cancelled".
+  // Hard-deletes the settlement on the backend (which also closes the
+  // session and frees the table — see
+  // lib/admin-api.ts:deleteSettlement / backend settlementService.js), then
+  // removes it from the table immediately and refreshes the overview cards.
+  const handleConfirmDelete = async () => {
+    if (!settlementToDelete) return;
+    setDeleting(true);
+    try {
+      await deleteSettlement(settlementToDelete.settlementId);
+      setSettlements((prev) => prev.filter((s) => s.settlementId !== settlementToDelete.settlementId));
+      setSettlementToDelete(null);
+      showToast({ ok: true, message: "Settlement deleted successfully." });
+      onDeleted();
+    } catch (err) {
+      showToast({ ok: false, message: err instanceof Error ? err.message : "Could not delete the settlement." });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <Card>
+      {toast && (
+        <div
+          style={{
+            marginBottom: 14,
+            padding: "10px 14px",
+            borderRadius: 10,
+            background: toast.ok ? `${adminColors.success}14` : `${adminColors.danger}14`,
+            color: toast.ok ? adminColors.success : adminColors.danger,
+            ...textStyle(13, 600),
+          }}
+        >
+          {toast.message}
+        </div>
+      )}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16, alignItems: "center" }}>
         <div style={{ position: "relative", flex: "1 1 240px" }}>
           <Search size={14} color={adminColors.textSecondary} style={{ position: "absolute", left: 10, top: 10 }} />
@@ -330,11 +386,14 @@ function SettlementsTab({ onCollect }: { onCollect: (settlementId: string) => vo
                   </td>
                   <td style={tdStyle}>{formatDateTime(s.submittedAt)}</td>
                   <td style={tdStyle}>
-                    {s.paymentStatus === "pending" ? (
-                      <SecondaryButton onClick={() => onCollect(s.settlementId)}>Collect</SecondaryButton>
-                    ) : (
-                      "—"
-                    )}
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {s.paymentStatus === "pending" && (
+                        <SecondaryButton onClick={() => onCollect(s.settlementId)}>Collect</SecondaryButton>
+                      )}
+                      <SecondaryButton danger onClick={() => setSettlementToDelete(s)}>
+                        <Trash2 size={13} /> Delete
+                      </SecondaryButton>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -342,7 +401,70 @@ function SettlementsTab({ onCollect }: { onCollect: (settlementId: string) => vo
           </table>
         </div>
       )}
+
+      {settlementToDelete && (
+        <DeleteSettlementModal
+          settlement={settlementToDelete}
+          deleting={deleting}
+          onCancel={() => (deleting ? undefined : setSettlementToDelete(null))}
+          onConfirm={handleConfirmDelete}
+        />
+      )}
     </Card>
+  );
+}
+
+// Permanent Settlement Deletion — confirmation dialog. A hard,
+// unrecoverable delete (not a status change to "cancelled"), so it gets an
+// explicit confirmation rather than proceeding silently.
+function DeleteSettlementModal({
+  settlement,
+  deleting,
+  onCancel,
+  onConfirm,
+}: {
+  settlement: Settlement;
+  deleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Modal title="Delete Settlement" onClose={deleting ? () => {} : onCancel} closeOnOverlayClick={!deleting}>
+      <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+        <div
+          style={{
+            flexShrink: 0,
+            width: 36,
+            height: 36,
+            borderRadius: "50%",
+            background: `${adminColors.danger}1A`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <AlertTriangle size={18} color={adminColors.danger} />
+        </div>
+        <div style={{ fontFamily: bodyFont, fontSize: 13, color: adminColors.text, lineHeight: 1.6 }}>
+          <p style={{ margin: 0, fontWeight: 700 }}>Delete this settlement? This action cannot be undone.</p>
+          <p style={{ margin: "6px 0 0", color: adminColors.textSecondary }}>
+            Bill {settlement.billNumber} for {settlement.tableLabel} ({formatCurrency(settlement.grandTotal)}) will
+            be permanently removed from the database. The table&apos;s session will be closed and the table freed.
+            The underlying orders are kept for reference but will no longer count toward revenue.
+          </p>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <SecondaryButton onClick={onCancel} disabled={deleting}>
+          Cancel
+        </SecondaryButton>
+        <PrimaryButton danger onClick={onConfirm} disabled={deleting}>
+          {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+          {deleting ? "Deleting…" : "Delete Permanently"}
+        </PrimaryButton>
+      </div>
+    </Modal>
   );
 }
 

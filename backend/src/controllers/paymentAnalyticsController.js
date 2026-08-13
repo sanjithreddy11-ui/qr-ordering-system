@@ -40,6 +40,11 @@ const getPaymentOverview = asyncHandler(async (req, res) => {
       $match: {
         restaurantId,
         status: { $ne: "cancelled" },
+        // Settlements Module: an order whose settlement was later deleted
+        // (Settlements page -> Delete) stays in the collection for
+        // historical/reference purposes but must not count toward revenue —
+        // see models/Order.js:excludedFromRevenue.
+        excludedFromRevenue: { $ne: true },
         placedAt: { $gte: fromDate, $lte: toDate },
       },
     },
@@ -104,6 +109,8 @@ const getPaymentDailyBreakdown = asyncHandler(async (req, res) => {
       $match: {
         restaurantId,
         status: { $ne: "cancelled" },
+        // See getPaymentOverview above — same exclusion.
+        excludedFromRevenue: { $ne: true },
         placedAt: { $gte: fromDate, $lte: toDate },
       },
     },
@@ -148,7 +155,9 @@ const listPaymentTransactions = asyncHandler(async (req, res) => {
   const { restaurantId, search, method, status, from, to, sort, limit } = req.query;
   if (!restaurantId) throw new ApiError(400, "restaurantId query param is required");
 
-  const filter = { restaurantId, status: { $ne: "cancelled" } };
+  // See getPaymentOverview above — same exclusion for orders whose
+  // settlement was later deleted.
+  const filter = { restaurantId, status: { $ne: "cancelled" }, excludedFromRevenue: { $ne: true } };
 
   if (method === "online") {
     filter.paymentMethod = { $in: ONLINE_METHODS };
@@ -204,6 +213,9 @@ const getPendingCashPayments = asyncHandler(async (req, res) => {
     paymentMethod: "cash",
     paymentStatus: "pending",
     status: { $ne: "cancelled" },
+    // A deleted settlement's orders are no longer awaiting collection —
+    // there's nothing left to collect them into. See excludedFromRevenue.
+    excludedFromRevenue: { $ne: true },
   }).sort({ placedAt: 1 });
 
   res.json({
@@ -260,6 +272,7 @@ const getPaymentSuccessMetrics = asyncHandler(async (req, res) => {
   const successful = await Order.countDocuments({
     restaurantId,
     status: { $ne: "cancelled" },
+    excludedFromRevenue: { $ne: true },
     placedAt: { $gte: fromDate, $lte: toDate },
   });
 

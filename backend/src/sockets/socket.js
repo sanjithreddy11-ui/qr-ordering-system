@@ -312,6 +312,11 @@ const emitSettlementCreated = (s) => emitTableEvent(s.restaurantId, "settlementC
 // A settlement's status changed — Collect Payment completed (paid/credit)
 // or a credit balance was cleared.
 const emitSettlementUpdated = (s) => emitTableEvent(s.restaurantId, "settlementUpdated", s);
+// A settlement was permanently deleted (Settlements page -> Delete). Payload
+// is just the id, same lightweight shape as emitOrderDeleted, since the
+// settlement doc no longer exists for listeners to read fields off of.
+const emitSettlementDeleted = (s) =>
+  emitTableEvent(s.restaurantId, "settlementDeleted", { settlementId: s.settlementId });
 
 module.exports = {
   initSocket,
@@ -336,4 +341,5 @@ module.exports = {
   emitSessionTransferred,
   emitSettlementCreated,
   emitSettlementUpdated,
+  emitSettlementDeleted,
 };
