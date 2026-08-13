@@ -1312,6 +1312,17 @@ export async function collectSettlement(
   return handle(res);
 }
 
+// Permanent Settlement Deletion (Settlements page -> Delete) — a HARD
+// delete, not a status change to "cancelled". Closes the dining session and
+// frees the table server-side (see
+// backend/src/services/settlementService.js:deleteSettlementCascade); the
+// underlying orders are kept for historical/reference purposes but stop
+// counting toward revenue.
+export async function deleteSettlement(settlementId: string): Promise<void> {
+  const res = await authFetch(`/api/admin/settlements/${settlementId}`, { method: "DELETE" });
+  await handle(res);
+}
+
 export type SettlementHistoryRange = "today" | "yesterday" | "7d" | "30d" | "custom";
 // Date-wise Collection & Settlement Reporting: superset of SettlementHistoryRange
 // with "thisMonth" (calendar month-to-date), used by fetchDateWiseReport.
