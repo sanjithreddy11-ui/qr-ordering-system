@@ -22,7 +22,7 @@ import { usePhoneAuth } from "@/hooks/usePhoneAuth";
 import CartBackground from "@/components/customer/CartBackground";
 import OrderSummaryCard from "@/components/customer/OrderSummaryCard";
 
-const PHONE_REGEX = /^\d{10}$/; // 10-digit local number; sent to 2Factor as 91XXXXXXXXXX
+const PHONE_REGEX = /^\d{10}$/; // 10-digit local number
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -47,7 +47,6 @@ export default function CheckoutPage() {
     specialInstructions: "",
     paymentMethod: "cash",
   });
-  const [otp, setOtp] = useState("");
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -156,7 +155,6 @@ export default function CheckoutPage() {
       if (err instanceof ApiRequestError && err.status === 401) {
         useVisitAuthStore.getState().clearVisit();
         phoneAuth.reset();
-        setOtp("");
         setError("Your visit has ended. Please verify your phone number again to order.");
         setPlacing(false);
         return;
@@ -170,19 +168,15 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleSendOtp = () => {
+  // One-step "Verify": no OTP is sent or entered (real OTP verification is
+  // disabled). The backend still opens the normal ACTIVE visit session.
+  const handleVerifyPhone = () => {
     if (!PHONE_REGEX.test(phone)) return;
-    phoneAuth.sendOtp(phone);
-  };
-
-  const handleVerifyOtp = () => {
-    if (otp.trim().length !== 6) return;
-    phoneAuth.verifyOtp(otp.trim(), { tableToken, name });
+    phoneAuth.verifyPhone(phone, { tableToken, name });
   };
 
   const handleChangeNumber = () => {
     phoneAuth.reset();
-    setOtp("");
   };
 
   const glassCardStyle: React.CSSProperties = {
@@ -449,11 +443,11 @@ export default function CheckoutPage() {
                     Edit
                   </button>
                 )}
-                {!phoneVerified && phoneAuth.status !== "sent" && phoneAuth.status !== "verifying" && (
+                {!phoneVerified && (
                   <button
                     type="button"
-                    onClick={handleSendOtp}
-                    disabled={!PHONE_REGEX.test(phone) || phoneAuth.status === "sending"}
+                    onClick={handleVerifyPhone}
+                    disabled={!PHONE_REGEX.test(phone) || phoneAuth.status === "verifying"}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -462,7 +456,7 @@ export default function CheckoutPage() {
                       borderRadius: 18,
                       border: "none",
                       background:
-                        !PHONE_REGEX.test(phone) || phoneAuth.status === "sending"
+                        !PHONE_REGEX.test(phone) || phoneAuth.status === "verifying"
                           ? "linear-gradient(135deg, #97A399 0%, #7C8A7E 100%)"
                           : "linear-gradient(135deg, #3A4C3B 0%, #263429 100%)",
                       color: "#fff",
@@ -470,19 +464,19 @@ export default function CheckoutPage() {
                       fontWeight: 700,
                       fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
                       cursor:
-                        !PHONE_REGEX.test(phone) || phoneAuth.status === "sending"
+                        !PHONE_REGEX.test(phone) || phoneAuth.status === "verifying"
                           ? "not-allowed"
                           : "pointer",
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {phoneAuth.status === "sending" ? (
+                    {phoneAuth.status === "verifying" ? (
                       <>
                         <Loader2 size={13} className="spin" />
-                        Sending…
+                        Verifying…
                       </>
                     ) : (
-                      "Send OTP"
+                      "Verify"
                     )}
                   </button>
                 )}
@@ -506,80 +500,6 @@ export default function CheckoutPage() {
                 >
                   <CheckCircle2 size={16} color="#3A4C3B" />
                   Phone Verified
-                </div>
-              )}
-
-              {/* OTP entry — only shown once an OTP has actually been sent */}
-              {!phoneVerified && phoneAuth.status !== "idle" && phoneAuth.status !== "sending" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="Enter 6-digit OTP"
-                      value={otp}
-                      maxLength={6}
-                      onChange={(e) => setOtp(e.target.value.replace(/[^\d]/g, "").slice(0, 6))}
-                      style={{ ...inputStyle, flex: 1, letterSpacing: "0.3em" }}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleVerifyOtp}
-                      disabled={otp.length !== 6 || phoneAuth.status === "verifying"}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        padding: "0 16px",
-                        borderRadius: 18,
-                        border: "none",
-                        background:
-                          otp.length !== 6 || phoneAuth.status === "verifying"
-                            ? "linear-gradient(135deg, #97A399 0%, #7C8A7E 100%)"
-                            : "linear-gradient(135deg, #3A4C3B 0%, #263429 100%)",
-                        color: "#fff",
-                        fontSize: 12,
-                        fontWeight: 700,
-                        fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
-                        cursor:
-                          otp.length !== 6 || phoneAuth.status === "verifying"
-                            ? "not-allowed"
-                            : "pointer",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {phoneAuth.status === "verifying" ? (
-                        <>
-                          <Loader2 size={13} className="spin" />
-                          Verifying…
-                        </>
-                      ) : (
-                        "Verify OTP"
-                      )}
-                    </button>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={phoneAuth.resendOtp}
-                    disabled={phoneAuth.resendSeconds > 0}
-                    style={{
-                      alignSelf: "flex-start",
-                      background: "none",
-                      border: "none",
-                      padding: 0,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      fontFamily: "var(--font-body, 'Inter', system-ui, sans-serif)",
-                      color: phoneAuth.resendSeconds > 0 ? "#999" : "#3A4C3B",
-                      cursor: phoneAuth.resendSeconds > 0 ? "not-allowed" : "pointer",
-                      textDecoration: phoneAuth.resendSeconds > 0 ? "none" : "underline",
-                    }}
-                  >
-                    {phoneAuth.resendSeconds > 0
-                      ? `Resend OTP in ${phoneAuth.resendSeconds}s`
-                      : "Resend OTP"}
-                  </button>
                 </div>
               )}
 

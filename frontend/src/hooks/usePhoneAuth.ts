@@ -20,6 +20,8 @@ interface UsePhoneAuthResult {
   verificationToken: string | null;
   verifiedPhone: string | null;
   sendOtp: (phoneDigits: string) => Promise<void>;
+  // Single-step verification with no OTP (development/demo mode).
+  verifyPhone: (phoneDigits: string, ctx: { tableToken: string; name?: string }) => Promise<void>;
   verifyOtp: (code: string, ctx: { tableToken: string; name?: string }) => Promise<void>;
   // Marks the flow verified from an ALREADY-ACTIVE backend visit (no OTP).
   restoreVerified: (visit: { visitToken: string; phone: string }) => void;
@@ -29,8 +31,10 @@ interface UsePhoneAuthResult {
 
 /**
  * Drives the checkout OTP flow against our own backend (POST /api/otp/send
- * and /api/otp/verify), which in turn calls 2Factor.in — no client SDK or
- * reCAPTCHA needed since the SMS sending happens entirely server-side.
+ * and /api/otp/verify). Real OTP/SMS verification is currently DISABLED
+ * (development/demo mode): the checkout uses verifyPhone() below, a single
+ * step that never sends an OTP. sendOtp/verifyOtp are kept for re-enabling
+ * real verification (backend OTP_PROVIDER=2factor).
  */
 export function usePhoneAuth(): UsePhoneAuthResult {
   const [status, setStatus] = useState<PhoneAuthStatus>("idle");
@@ -95,6 +99,28 @@ export function usePhoneAuth(): UsePhoneAuthResult {
     }
   }, []);
 
+  const verifyPhone = useCallback(async (phoneDigits: string, ctx: { tableToken: string; name?: string }) => {
+    setError(null);
+    setStatus("verifying");
+    try {
+      const deviceId = useVisitAuthStore.getState().ensureDeviceId();
+      const visit = await apiVerifyOtp(phoneDigits, "", { deviceId, ...ctx });
+      lastPhoneRef.current = phoneDigits;
+      useVisitAuthStore.getState().setVisit({
+        visitToken: visit.visitToken,
+        phone: phoneDigits,
+        name: visit.name,
+      });
+      setVerificationToken(visit.visitToken);
+      setVerifiedPhone(phoneDigits);
+      setStatus("verified");
+    } catch (err) {
+      console.error("verifyPhone failed:", err);
+      setError(err instanceof Error ? err.message : "Couldn't verify your number. Please try again.");
+      setStatus("idle");
+    }
+  }, []);
+
   const restoreVerified = useCallback((visit: { visitToken: string; phone: string }) => {
     lastPhoneRef.current = visit.phone;
     setVerificationToken(visit.visitToken);
@@ -119,6 +145,7 @@ export function usePhoneAuth(): UsePhoneAuthResult {
     verificationToken,
     verifiedPhone,
     sendOtp,
+    verifyPhone,
     verifyOtp,
     restoreVerified,
     resendOtp,

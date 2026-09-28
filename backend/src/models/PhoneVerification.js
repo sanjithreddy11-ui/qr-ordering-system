@@ -19,6 +19,9 @@ const phoneVerificationSchema = new mongoose.Schema(
     phone: { type: String, required: true, unique: true, index: true },
     sessionId: { type: String, default: null },
     verified: { type: Boolean, default: false },
+    // How this verification was established: real 2Factor OTP, or the
+    // development/demo bypass (phone format only, NOT proof of ownership).
+    method: { type: String, enum: ["2factor", "dev-bypass"], default: "2factor" },
     token: { type: String, default: null, index: true },
     expiresAt: { type: Date, required: true },
   },
