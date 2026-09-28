@@ -3,7 +3,7 @@ import type { MenuCategory } from "@/lib/menu-data";
 import type { Order, PaymentMethod } from "@/types/order";
 import type { Restaurant } from "@/types/session";
 
-class ApiRequestError extends Error {
+export class ApiRequestError extends Error {
   status: number;
   constructor(status: number, message: string) {
     super(message);
@@ -36,14 +36,51 @@ export async function sendOtp(phone: string): Promise<void> {
   await handle<{ success: boolean }>(res);
 }
 
-export async function verifyOtp(phone: string, otp: string): Promise<string> {
+export interface VerifiedVisit {
+  visitToken: string;
+  name: string;
+}
+
+// Verifies the OTP AND opens a new ACTIVE visit session on the backend
+// (see backend controllers/otpController.js). The returned visitToken is
+// what authorizes every order for the rest of the visit — no more OTPs
+// until the visit is closed (Submit Bill).
+export async function verifyOtp(
+  phone: string,
+  otp: string,
+  ctx: { deviceId: string; tableToken: string; name?: string }
+): Promise<VerifiedVisit> {
   const res = await fetch(API_ENDPOINTS.otpVerify(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone, otp }),
+    body: JSON.stringify({ phone, otp, ...ctx }),
   });
-  const data = await handle<{ verified: boolean; token: string }>(res);
-  return data.token;
+  const data = await handle<{ verified: boolean; visitToken: string; name: string }>(res);
+  return { visitToken: data.visitToken, name: data.name };
+}
+
+export interface VisitStatus {
+  active: boolean;
+  visitToken?: string;
+  phone?: string;
+  name?: string;
+}
+
+// Asks the backend whether this device currently has an ACTIVE visit. The
+// answer is always server-side truth — a closed visit reports active:false.
+export async function getVisitStatus(tableToken: string, deviceId: string): Promise<VisitStatus> {
+  const res = await fetch(API_ENDPOINTS.visitStatus(tableToken, deviceId), { cache: "no-store" });
+  return handle<VisitStatus>(res);
+}
+
+// Full cross-visit order history for the authenticated customer.
+export async function fetchCustomerOrderHistory(customerPhone: string, visitToken: string): Promise<Order[]> {
+  const res = await fetch(API_ENDPOINTS.orderHistory(customerPhone), {
+    headers: { Authorization: `Bearer ${visitToken}` },
+    cache: "no-store",
+  });
+  const data = await handle<{ orders: Order[] }>(res);
+  return data.orders;
 }
 
 export interface PlaceOrderPayload {
@@ -63,8 +100,7 @@ export interface PlaceOrderPayload {
   customerPhone?: string;
 }
 
-// verificationToken is the token returned by verifyOtp() above, once the
-// customer has confirmed the OTP for this phone. The backend re-checks it
+// verificationToken is the visitToken from verifyOtp()/getVisitStatus(). The backend re-checks it
 // against the phone number on this order before creating it — see
 // backend/src/middleware/verifyPhoneToken.js.
 export async function placeOrder(payload: PlaceOrderPayload, verificationToken: string): Promise<Order> {

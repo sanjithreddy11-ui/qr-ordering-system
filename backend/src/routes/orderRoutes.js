@@ -5,6 +5,7 @@ const {
   listOrders,
   listOrdersBySession,
   updateOrderStatus,
+  getCustomerOrderHistory,
 } = require("../controllers/orderController");
 const { getAnalytics, getPeakHours } = require("../controllers/analyticsController");
 const { requireAuth } = require("../middleware/auth");
@@ -18,10 +19,11 @@ const router = express.Router();
 // (analytics), exactly as before.
 router.post("/", verifyPhoneToken, createOrder);
 router.get("/", listOrders);
-// IMPORTANT: both of these must come before "/:orderId" or Express will
-// treat "session"/"analytics" as an orderId value and these routes will
-// never be reached.
+// IMPORTANT: all of these must come before "/:orderId" or Express will
+// treat "session"/"analytics"/"history" as an orderId value and these
+// routes will never be reached.
 router.get("/session/:sessionId", listOrdersBySession);
+router.get("/history", getCustomerOrderHistory);
 // Revenue data is admin-only, unlike the rest of this router (kitchen
 // display + customer order tracking, which stay unauthenticated).
 router.get("/analytics", requireAuth, getAnalytics);

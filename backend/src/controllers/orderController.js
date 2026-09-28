@@ -4,6 +4,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const { emitOrderStatusUpdate } = require("../sockets/socket");
 const { validateAndBuildOrder, finalizeOrder, recalculateDownstreamForOrder } = require("../services/orderService");
 const gstService = require("../services/gstService");
+const { resolveActiveVisitByToken } = require("../services/visitSessionService");
 
 // POST /api/orders
 // Body: { sessionId, restaurantId, tableToken, items: [{ id, quantity }],
@@ -33,6 +34,42 @@ const listOrdersBySession = asyncHandler(async (req, res) => {
   const past = orders.filter((o) => ["completed", "cancelled"].includes(o.status));
 
   res.json({ active, past });
+});
+
+// GET /api/orders/history?customerPhone=9876543210
+// Header: Authorization: Bearer <visitToken>
+//
+// Customer Order History (Requirement 10/19): the customer's FULL order
+// history across every past visit, not just the current one — powered by
+// the permanent customerPhone link on Order (see models/Order.js), which
+// closing/superseding VisitSessions never touches. Requires the SAME
+// active-visit proof as placing an order (see
+// middleware/verifyPhoneToken.js / services/visitSessionService.js) so a
+// customer can only ever see their own history, never another customer's
+// — there is deliberately no way to fetch this by phone number alone.
+const getCustomerOrderHistory = asyncHandler(async (req, res) => {
+  const header = req.headers.authorization || "";
+  const [scheme, token] = header.split(" ");
+  const customerPhone = String(req.query.customerPhone || "").trim();
+
+  if (scheme !== "Bearer" || !token) {
+    throw new ApiError(401, "Missing phone verification token. Please verify your phone number.");
+  }
+  if (!customerPhone) {
+    throw new ApiError(400, "customerPhone is required");
+  }
+
+  const visit = await resolveActiveVisitByToken(token, customerPhone);
+  if (!visit) {
+    throw new ApiError(401, "Phone verification failed or expired. Please verify your phone number again.");
+  }
+
+  const orders = await Order.find({ restaurantId: visit.restaurantId, customerPhone })
+    .sort({ placedAt: -1 })
+    .limit(100)
+    .lean();
+
+  res.json({ orders });
 });
 
 // GET /api/orders/:orderId
@@ -140,4 +177,11 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   res.json({ order });
 });
 
-module.exports = { createOrder, getOrderById, listOrders, listOrdersBySession, updateOrderStatus };
+module.exports = {
+  createOrder,
+  getOrderById,
+  listOrders,
+  listOrdersBySession,
+  updateOrderStatus,
+  getCustomerOrderHistory,
+};

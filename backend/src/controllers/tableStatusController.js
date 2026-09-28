@@ -4,6 +4,7 @@ const Reservation = require("../models/Reservation");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
 const { sortTablesByLabel } = require("../utils/sortTablesByLabel");
+const { closeActiveVisitSessionsForTable } = require("../services/visitSessionService");
 const {
   emitTableBilling,
   emitTableCleaning,
@@ -123,6 +124,16 @@ const closeSession = asyncHandler(async (req, res) => {
   table.currentReservationId = null;
   table.occupiedAt = null;
   await table.save();
+
+  // Visit-Based Customer Authentication: defensive close — an admin can
+  // manually close a table's dining session directly (skipping Billing
+  // entirely, e.g. a walk-out), so end every customer's open visit at this
+  // table here too rather than leaving it dangling until they scan again.
+  try {
+    await closeActiveVisitSessionsForTable(table._id, "TABLE_CLOSED");
+  } catch (err) {
+    console.error("Closing visit sessions on table close failed:", err);
+  }
 
   emitTableCleaning(table);
   res.json({ table, closedSession: session });

@@ -16,4 +16,8 @@ export const API_ENDPOINTS = {
   tableByToken: (token: string) => `${API_BASE_URL}/api/tables/${token}`,
   otpSend: () => `${API_BASE_URL}/api/otp/send`,
   otpVerify: () => `${API_BASE_URL}/api/otp/verify`,
+  visitStatus: (tableToken: string, deviceId: string) =>
+    `${API_BASE_URL}/api/visit/status?tableToken=${encodeURIComponent(tableToken)}&deviceId=${encodeURIComponent(deviceId)}`,
+  orderHistory: (customerPhone: string) =>
+    `${API_BASE_URL}/api/orders/history?customerPhone=${encodeURIComponent(customerPhone)}`,
 };

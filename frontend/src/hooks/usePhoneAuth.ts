@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { sendOtp as apiSendOtp, verifyOtp as apiVerifyOtp } from "@/lib/api";
+import { useVisitAuthStore } from "@/store/visit-auth-store";
 
 const RESEND_SECONDS = 30;
 
@@ -19,7 +20,9 @@ interface UsePhoneAuthResult {
   verificationToken: string | null;
   verifiedPhone: string | null;
   sendOtp: (phoneDigits: string) => Promise<void>;
-  verifyOtp: (code: string) => Promise<void>;
+  verifyOtp: (code: string, ctx: { tableToken: string; name?: string }) => Promise<void>;
+  // Marks the flow verified from an ALREADY-ACTIVE backend visit (no OTP).
+  restoreVerified: (visit: { visitToken: string; phone: string }) => void;
   resendOtp: () => Promise<void>;
   reset: () => void;
 }
@@ -66,7 +69,7 @@ export function usePhoneAuth(): UsePhoneAuthResult {
     await sendOtp(lastPhoneRef.current);
   }, [resendSeconds, sendOtp]);
 
-  const verifyOtp = useCallback(async (code: string) => {
+  const verifyOtp = useCallback(async (code: string, ctx: { tableToken: string; name?: string }) => {
     if (!lastPhoneRef.current) {
       setError("Please request an OTP first.");
       return;
@@ -74,8 +77,15 @@ export function usePhoneAuth(): UsePhoneAuthResult {
     setError(null);
     setStatus("verifying");
     try {
-      const token = await apiVerifyOtp(lastPhoneRef.current, code);
-      setVerificationToken(token);
+      const deviceId = useVisitAuthStore.getState().ensureDeviceId();
+      const visit = await apiVerifyOtp(lastPhoneRef.current, code, { deviceId, ...ctx });
+      // Persist the new ACTIVE visit so later orders/page loads skip OTP.
+      useVisitAuthStore.getState().setVisit({
+        visitToken: visit.visitToken,
+        phone: lastPhoneRef.current,
+        name: visit.name,
+      });
+      setVerificationToken(visit.visitToken);
       setVerifiedPhone(lastPhoneRef.current);
       setStatus("verified");
     } catch (err) {
@@ -83,6 +93,14 @@ export function usePhoneAuth(): UsePhoneAuthResult {
       setError(err instanceof Error ? err.message : "Couldn't verify the OTP. Please try again.");
       setStatus("sent");
     }
+  }, []);
+
+  const restoreVerified = useCallback((visit: { visitToken: string; phone: string }) => {
+    lastPhoneRef.current = visit.phone;
+    setVerificationToken(visit.visitToken);
+    setVerifiedPhone(visit.phone);
+    setError(null);
+    setStatus("verified");
   }, []);
 
   const reset = useCallback(() => {
@@ -102,6 +120,7 @@ export function usePhoneAuth(): UsePhoneAuthResult {
     verifiedPhone,
     sendOtp,
     verifyOtp,
+    restoreVerified,
     resendOtp,
     reset,
   };

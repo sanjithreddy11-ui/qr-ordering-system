@@ -7,6 +7,7 @@ const generateInvoiceNumber = require("../utils/generateInvoiceNumber");
 const generateBillNumber = require("../utils/generateBillNumber");
 const generateSettlementId = require("../utils/generateSettlementId");
 const gstService = require("./gstService");
+const { closeActiveVisitSessionsForTable } = require("./visitSessionService");
 const {
   emitTableAwaitingPayment,
   emitSettlementCreated,
@@ -133,6 +134,21 @@ async function submitBillForTable(tableId, staff) {
   table.status = "awaiting_payment";
   await table.save();
 
+  // Visit-Based Customer Authentication: this IS the primary event that
+  // ends every customer's OTP-trust at this table (see
+  // models/VisitSession.js). Runs only now that the settlement has been
+  // created and saved successfully — a failed Submit Bill (thrown above,
+  // before this point) never reaches here, so a customer's active visit
+  // is left completely untouched and they can keep ordering. Wrapped
+  // defensively so a hiccup here can never roll back an otherwise-
+  // successful bill submission, matching how every other post-order side
+  // effect in this codebase (see services/orderService.js) is handled.
+  try {
+    await closeActiveVisitSessionsForTable(table._id, "BILL_SUBMITTED");
+  } catch (err) {
+    console.error("Closing visit sessions after Submit Bill failed:", err);
+  }
+
   emitTableAwaitingPayment(table);
   emitSettlementCreated(settlement);
   emitSessionPaymentUpdated(session);
@@ -168,6 +184,18 @@ async function deleteSettlementCascade(settlement) {
     session.sessionEnd = now;
     await session.save();
     emitSessionEnded(session);
+  }
+
+  // Visit-Based Customer Authentication: a settlement can be deleted
+  // without ever going through Submit Bill's normal success path (e.g. a
+  // settlement created directly via POST /api/admin/settlements and then
+  // deleted), so close out any still-active visit sessions here too —
+  // defensive, since submitBillForTable already closes them in the normal
+  // path and this will simply find nothing left to do.
+  try {
+    await closeActiveVisitSessionsForTable(settlement.tableId, "SETTLEMENT_DELETED");
+  } catch (err) {
+    console.error("Closing visit sessions on settlement deletion failed:", err);
   }
 
   // Only free the table if it's still sitting on THIS settlement's session —

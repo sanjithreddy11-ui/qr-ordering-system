@@ -11,6 +11,7 @@ const { splitGst, computeOfferDiscount } = require("../utils/billingCalculator")
 const gstService = require("../services/gstService");
 const { emitTableAvailable, emitSessionEnded, emitSessionPaymentUpdated } = require("../sockets/socket");
 const { submitBillForTable } = require("../services/settlementService");
+const { closeActiveVisitSessionsForTable } = require("../services/visitSessionService");
 
 async function getActiveSessionForTable(tableId) {
   const table = await Table.findById(tableId);
@@ -352,6 +353,15 @@ const collectPayment = asyncHandler(async (req, res) => {
   table.currentReservationId = null;
   table.occupiedAt = null;
   await table.save();
+
+  // Visit-Based Customer Authentication: defensive close — this legacy
+  // direct-collect path can close a dining session without ever going
+  // through Submit Bill, so end every open visit at this table here too.
+  try {
+    await closeActiveVisitSessionsForTable(table._id, "SETTLEMENT_COLLECTED");
+  } catch (err) {
+    console.error("Closing visit sessions on collect payment failed:", err);
+  }
 
   emitSessionEnded(session);
   emitTableAvailable(table);

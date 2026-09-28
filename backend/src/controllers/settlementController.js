@@ -6,6 +6,7 @@ const Customer = require("../models/Customer");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
 const { submitBillForTable, deleteSettlementCascade } = require("../services/settlementService");
+const { closeActiveVisitSessionsForTable } = require("../services/visitSessionService");
 const getBusinessDate = require("../utils/getBusinessDate");
 const {
   emitSettlementUpdated,
@@ -330,6 +331,16 @@ const collectSettlement = asyncHandler(async (req, res) => {
     session.sessionEnd = now;
     await session.save();
     emitSessionEnded(session);
+  }
+
+  // Visit-Based Customer Authentication: defensive close — Submit Bill
+  // already ends every open visit at this table in the normal flow, so
+  // this is only a safety net for a settlement that somehow reached
+  // Collect Payment without going through submitBillForTable.
+  try {
+    await closeActiveVisitSessionsForTable(settlement.tableId, "SETTLEMENT_COLLECTED");
+  } catch (err) {
+    console.error("Closing visit sessions on settlement collection failed:", err);
   }
 
   const table = await Table.findById(settlement.tableId);

@@ -5,6 +5,7 @@ const compression = require("compression");
 const menuRoutes = require("./routes/menuRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const otpRoutes = require("./routes/otpRoutes");
+const visitRoutes = require("./routes/visitRoutes");
 const sessionRoutes = require("./routes/sessionRoutes");
 const restaurantRoutes = require("./routes/restaurantRoutes");
 const tableRoutes = require("./routes/tableRoutes");
@@ -44,6 +45,7 @@ function createApp(clientOrigin) {
   app.use("/api/menu", menuRoutes);
   app.use("/api/orders", orderRoutes);
   app.use("/api/otp", otpRoutes);
+  app.use("/api/visit", visitRoutes);
   app.use("/api/sessions", sessionRoutes);
   app.use("/api/restaurants", restaurantRoutes);
   app.use("/api/tables", tableRoutes);

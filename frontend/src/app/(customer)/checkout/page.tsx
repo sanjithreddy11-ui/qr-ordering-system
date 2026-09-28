@@ -7,7 +7,7 @@ import {
   Loader2,
   Pencil,
 } from "lucide-react";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useCartStore } from "@/store/cart-store";
@@ -16,7 +16,8 @@ import { useSessionStore } from "@/store/session-store";
 import { useBuildCustomerUrl } from "@/lib/customer-nav";
 import { RESTAURANT_ID } from "@/constants/restaurant";
 import { CheckoutForm } from "@/types/order";
-import { placeOrder } from "@/lib/api";
+import { placeOrder, getVisitStatus, ApiRequestError } from "@/lib/api";
+import { useVisitAuthStore } from "@/store/visit-auth-store";
 import { usePhoneAuth } from "@/hooks/usePhoneAuth";
 import CartBackground from "@/components/customer/CartBackground";
 import OrderSummaryCard from "@/components/customer/OrderSummaryCard";
@@ -53,6 +54,43 @@ export default function CheckoutPage() {
   const phoneAuth = usePhoneAuth();
 
   const setOrder = useOrderStore((s) => s.setOrder);
+  const restoreVerified = phoneAuth.restoreVerified;
+
+  // Visit-Based Customer Authentication: before asking for a phone/OTP,
+  // ask the backend whether this device already has an ACTIVE visit. If so
+  // the customer is treated as verified (no OTP); if the visit was closed
+  // (e.g. the admin submitted the bill) the backend says so and OTP is
+  // required again — even on this same device. The result is always
+  // server-side truth, never the cached localStorage values alone.
+  useEffect(() => {
+    if (!tableToken) return;
+    let cancelled = false;
+    (async () => {
+      await Promise.resolve(useVisitAuthStore.persist.rehydrate());
+      const store = useVisitAuthStore.getState();
+      const deviceId = store.ensureDeviceId();
+      try {
+        const status = await getVisitStatus(tableToken, deviceId);
+        if (cancelled) return;
+        if (status.active && status.visitToken && status.phone) {
+          store.setVisit({ visitToken: status.visitToken, phone: status.phone, name: status.name });
+          setForm((f: CheckoutForm) => ({
+            ...f,
+            customerPhone: status.phone as string,
+            customerName: f.customerName || (status.name && status.name !== "Guest" ? status.name : ""),
+          }));
+          restoreVerified({ visitToken: status.visitToken, phone: status.phone });
+        } else {
+          store.clearVisit();
+        }
+      } catch {
+        // Backend unreachable — fall back to the normal OTP flow.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tableToken, restoreVerified]);
 
   const name = form.customerName.trim();
   const phone = form.customerPhone.trim();
@@ -113,6 +151,16 @@ export default function CheckoutPage() {
       setOrder(order);
       router.push(buildCustomerUrl("/order-success"));
     } catch (err) {
+      // 401 = the visit is no longer active on the backend (bill was
+      // submitted, etc.). Drop the stale state and ask for OTP again.
+      if (err instanceof ApiRequestError && err.status === 401) {
+        useVisitAuthStore.getState().clearVisit();
+        phoneAuth.reset();
+        setOtp("");
+        setError("Your visit has ended. Please verify your phone number again to order.");
+        setPlacing(false);
+        return;
+      }
       setError(
         err instanceof Error
           ? err.message
@@ -129,7 +177,7 @@ export default function CheckoutPage() {
 
   const handleVerifyOtp = () => {
     if (otp.trim().length !== 6) return;
-    phoneAuth.verifyOtp(otp.trim());
+    phoneAuth.verifyOtp(otp.trim(), { tableToken, name });
   };
 
   const handleChangeNumber = () => {

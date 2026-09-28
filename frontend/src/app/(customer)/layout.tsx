@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useSessionStore } from "@/store/session-store";
 import { useCartStore } from "@/store/cart-store";
 import { useOrderStore } from "@/store/order-store";
+import { useVisitAuthStore } from "@/store/visit-auth-store";
 import BottomNav from "@/components/customer/BottomNav";
 import CategoryMenuBackButton from "@/components/customer/CategoryMenuBackButton";
 
@@ -32,6 +33,13 @@ function CustomerLayoutInner({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     useCartStore.persist.rehydrate();
     useOrderStore.persist.rehydrate();
+    // Visit-Based Customer Authentication: restore the persisted device id
+    // (and any cached visit token) from localStorage, then guarantee a
+    // device id exists. Must rehydrate BEFORE ensureDeviceId, or a
+    // returning device would generate a fresh id and lose its identity.
+    Promise.resolve(useVisitAuthStore.persist.rehydrate()).then(() => {
+      useVisitAuthStore.getState().ensureDeviceId();
+    });
   }, []);
 
   const hasBootstrapped = useRef(false);

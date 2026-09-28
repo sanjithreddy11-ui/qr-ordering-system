@@ -1,12 +1,21 @@
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
-const { resolveVerifiedPhone } = require("../services/otpService");
+const { resolveActiveVisitByToken } = require("../services/visitSessionService");
 
-// Verifies the phone-verification token issued by POST /api/otp/verify
-// (Authorization: Bearer <token>) against the phone number on the order
-// body, and attaches the confirmed phone to req.verifiedPhone. Used only
-// on POST /api/orders — every other route (kitchen display, session
-// polling, admin) is unaffected.
+// Visit-Based Customer Authentication: verifies the Authorization: Bearer
+// <visitToken> issued by POST /api/otp/verify (see
+// services/visitSessionService.js:createVisitSession) against the phone
+// number on the order body, and attaches the confirmed phone + visit to
+// req.verifiedPhone / req.visitSession. Used only on POST /api/orders —
+// every other route (kitchen display, session polling, admin) is
+// unaffected.
+//
+// This is the ONE place that decides whether "no OTP" is actually allowed
+// for a given order — it never trusts customerPhone/deviceId/customerId
+// from the request body alone. A visit that was closed (bill submitted,
+// table force-closed, etc. — see services/visitSessionService.js:
+// closeActiveVisitSessionsForTable) fails here exactly like an expired/
+// missing token would, which is what forces OTP again on the next visit.
 const verifyPhoneToken = asyncHandler(async (req, res, next) => {
   const header = req.headers.authorization || "";
   const [scheme, token] = header.split(" ");
@@ -20,12 +29,13 @@ const verifyPhoneToken = asyncHandler(async (req, res, next) => {
     throw new ApiError(400, "Phone number is required");
   }
 
-  const verifiedPhone = await resolveVerifiedPhone(phone, token);
-  if (!verifiedPhone) {
+  const visit = await resolveActiveVisitByToken(token, phone);
+  if (!visit) {
     throw new ApiError(401, "Phone verification failed or expired. Please verify your phone number again.");
   }
 
-  req.verifiedPhone = verifiedPhone;
+  req.verifiedPhone = visit.phone;
+  req.visitSession = visit;
   next();
 });
 
