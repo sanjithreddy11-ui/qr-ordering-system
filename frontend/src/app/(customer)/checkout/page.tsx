@@ -11,7 +11,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useCartStore } from "@/store/cart-store";
-import { useOrderStore } from "@/store/order-store";
+import { buildOrderItemsPayload, placeOrderAndResetCart } from "@/lib/checkout";
 import { useSessionStore } from "@/store/session-store";
 import { useBuildCustomerUrl } from "@/lib/customer-nav";
 import { RESTAURANT_ID } from "@/constants/restaurant";
@@ -27,7 +27,7 @@ const PHONE_REGEX = /^\d{10}$/; // 10-digit local number
 export default function CheckoutPage() {
   const router = useRouter();
   const buildCustomerUrl = useBuildCustomerUrl();
-  const { items, subtotal, taxAmount, totalAmount, clearCart } = useCartStore();
+  const { items, subtotal, taxAmount, totalAmount } = useCartStore();
   const {
     sessionId,
     restaurantId: sessionRestaurantId,
@@ -48,11 +48,14 @@ export default function CheckoutPage() {
     paymentMethod: "cash",
   });
   const [placing, setPlacing] = useState(false);
+  // Set once the backend accepted the order and the cart was emptied, so the
+  // empty-cart guard below doesn't flash "Nothing to checkout" while the
+  // router moves on to the order-success page.
+  const [orderPlaced, setOrderPlaced] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const phoneAuth = usePhoneAuth();
 
-  const setOrder = useOrderStore((s) => s.setOrder);
   const restoreVerified = phoneAuth.restoreVerified;
 
   // Visit-Based Customer Authentication: before asking for a phone/OTP,
@@ -118,23 +121,15 @@ export default function CheckoutPage() {
     setPlacing(true);
     setError(null);
 
+    // Narrowed to `string` by the guard above; captured so it stays narrowed
+    // inside the callback passed to placeOrderAndResetCart below.
+    const verificationToken = phoneAuth.verificationToken;
+
     const orderPayload = {
       sessionId,
       restaurantId,
       tableToken,
-      // Menu Item Customization (Modifiers): each cart entry's selected
-      // modifiers, grouped back into { groupId, optionIds } — the shape
-      // the backend validates against the menu item's own modifierGroups
-      // (see backend/src/services/orderService.js:resolveLineModifiers).
-      // Omitted for a plain item (entry.modifiers is undefined/empty).
-      items: items.map((e) => ({
-        id: e.item.id,
-        quantity: e.quantity,
-        modifiers:
-          e.modifiers && e.modifiers.length > 0
-            ? e.modifiers.map((m) => ({ groupId: m.groupId, optionIds: [m.optionId] }))
-            : undefined,
-      })),
+      items: buildOrderItemsPayload(items),
       orderType: form.orderType,
       specialInstructions: form.specialInstructions,
       paymentMethod: form.paymentMethod,
@@ -146,8 +141,12 @@ export default function CheckoutPage() {
     // phone verification token proves OTP ownership; the backend
     // re-checks it against the phone before creating the order.
     try {
-      const order = await placeOrder(orderPayload, phoneAuth.verificationToken);
-      setOrder(order);
+      // On success this records the order for the order-success page AND
+      // empties the persisted cart — otherwise the next order from this
+      // table would still contain this one's items (and print them again
+      // on its KOT). See lib/checkout.ts.
+      await placeOrderAndResetCart(() => placeOrder(orderPayload, verificationToken));
+      setOrderPlaced(true);
       router.push(buildCustomerUrl("/order-success"));
     } catch (err) {
       // 401 = the visit is no longer active on the backend (bill was
@@ -215,6 +214,8 @@ export default function CheckoutPage() {
     backdropFilter: "blur(8px)",
     WebkitBackdropFilter: "blur(8px)",
   };
+
+  if (orderPlaced) return null;
 
   // Empty cart guard — matches Cart page empty state
   if (items.length === 0) {

@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --import ./tests/helpers/register.mjs --test --test-reporter=spec \"tests/**/*.test.mjs\""
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.2.11",

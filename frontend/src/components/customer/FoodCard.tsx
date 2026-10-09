@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { Minus, Plus } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { requiresCustomization, type MenuItem } from "@/lib/menu-data";
@@ -44,7 +43,7 @@ export default function FoodCard({
         delay: Math.min(index, 3) * 0.06,
         ease: EASE,
       }}
-      className="relative flex gap-4 overflow-hidden rounded-[28px] p-3.5 backdrop-blur-md"
+      className="relative flex flex-col gap-2.5 overflow-hidden rounded-[28px] px-5 py-4 backdrop-blur-md max-[360px]:px-4 max-[360px]:py-3.5"
       style={{
         background: "rgba(255, 255, 255, 0.55)",
         border: "1px solid rgba(255, 255, 255, 0.4)",
@@ -63,49 +62,45 @@ export default function FoodCard({
         }}
       />
 
-      <div className="relative h-[104px] w-[104px] shrink-0 overflow-hidden rounded-[18px] bg-bg-secondary">
-        <Image
-          src={item.image}
-          alt={item.name}
-          fill
-          className="object-cover"
-        />
+      {/* Top row: name (left) + dietary indicator (right) */}
+      <div className="relative flex items-start justify-between gap-3">
+        <h3 className="font-display min-w-0 flex-1 truncate text-[19px] font-semibold leading-tight text-text-primary">
+          {item.name}
+        </h3>
+
+        <span
+          className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] border ${
+            item.diet === "veg"
+              ? "border-green-secondary"
+              : "border-[#8B4B3B]"
+          }`}
+        >
+          <span
+            className={`h-2 w-2 rounded-full ${
+              item.diet === "veg"
+                ? "bg-green-secondary"
+                : "bg-[#8B4B3B]"
+            }`}
+          />
+        </span>
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
-        <div>
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="font-display truncate text-[19px] font-semibold leading-tight text-text-primary">
-              {item.name}
-            </h3>
+      {/* Middle: description, clamped to two lines */}
+      {item.description && (
+        <p className="font-body relative -mt-1 line-clamp-2 text-[13px] leading-snug text-text-secondary">
+          {item.description}
+        </p>
+      )}
 
-            <span
-              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] border ${
-                item.diet === "veg"
-                  ? "border-green-secondary"
-                  : "border-[#8B4B3B]"
-              }`}
-            >
-              <span
-                className={`h-2 w-2 rounded-full ${
-                  item.diet === "veg"
-                    ? "bg-green-secondary"
-                    : "bg-[#8B4B3B]"
-                }`}
-              />
-            </span>
-          </div>
-
-          <p className="font-body mt-1 line-clamp-2 text-[13px] leading-snug text-text-secondary">
-            {item.description}
-          </p>
-        </div>
-
-        <div className="mt-2 flex items-end justify-between">
-          <span className="font-body text-[15px] font-bold text-text-primary">
+      {/* Bottom row: price (left) + add / stepper (right) */}
+      <div className="relative flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center">
+          <span className="font-body text-[16px] font-bold text-text-primary">
             ₹ {item.price}
           </span>
+        </div>
 
+        <div className="shrink-0">
           <div className="relative flex h-8 items-center justify-end">
             {customizable ? (
               <motion.button
